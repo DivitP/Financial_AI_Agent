@@ -1,0 +1,4 @@
+langchain
+langchain-groq
+duckduckgo-search
+newspaper4k
