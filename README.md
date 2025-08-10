@@ -18,7 +18,24 @@ The platform:
 
 ## Project Structure
 
-...
+```
+Financial_AI_Agent/
+├── agents/
+│   ├── fundamental_agent.py
+│   ├── search_agent.py
+│   └── technical_analysis_agent.py
+├── chroma_db/
+│   └── vectorstore.db
+├── frontend/
+│   └── app.py
+├── workflow/
+│   └── agent_workflow.png
+├── main.py
+├── requirements.txt
+├── README.md
+└── .gitignore
+```
+
 
 ## Setup
 
