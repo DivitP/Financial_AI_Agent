@@ -396,20 +396,21 @@ if __name__ == "__main__":
     print("Professional-grade financial data")
     print("Real-time quotes, metrics, and analysis")
     print("-" * 60)
-    
+
     try:
+        ticker = input("Enter ticker (e.g., AAPL): ").strip().upper() or "AAPL"
         response = agent_executor.invoke({
-            "input": "Provide a comprehensive financial analysis of Meta Platforms Inc. (META). Include current stock performance, financial metrics, company profile, analyst estimates, recent news, and investment outlook."
+            "input": f"Provide a comprehensive financial analysis of {ticker}. Include current stock performance, financial metrics, company profile, analyst estimates, recent news, and investment outlook."
         })
-        
+
         print("\n" + "="*70)
-        print("COMPREHENSIVE META (META) FINANCIAL ANALYSIS")
+        print(f"COMPREHENSIVE {ticker} FINANCIAL ANALYSIS")
         print("="*70)
         print(response["output"])
         print("="*70)
-        
+
         print("\n" + "Data Sources: Financial Modeling Prep API + yfinance")
         print("Analysis generated:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        
+
     except Exception as e:
         print(f"Analysis failed: {str(e)}")

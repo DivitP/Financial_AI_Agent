@@ -1,4 +1,15 @@
 langchain
+langchain-core
+langchain-community
 langchain-groq
 duckduckgo-search
 newspaper4k
+python-dotenv
+requests
+yfinance
+pandas
+numpy
+matplotlib
+seaborn
+flask
+markdown

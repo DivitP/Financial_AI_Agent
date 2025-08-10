@@ -101,4 +101,6 @@ def run_agent(user_prompt):
         print(f"Error running agent: {e}")
 
 if __name__ == "__main__":
-    run_agent("Provide an in-depth stock analysis of Meta (META)")
+    import sys
+    ticker = (sys.argv[1] if len(sys.argv) > 1 else input("Enter ticker (e.g., AAPL): ").strip().upper() or "AAPL")
+    run_agent(f"Provide an in-depth stock analysis of {ticker}")

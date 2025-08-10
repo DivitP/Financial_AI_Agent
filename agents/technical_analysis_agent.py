@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 import warnings
 from typing import Dict, List, Tuple, Optional
 import seaborn as sns
-from scipy import stats
+import io
+# Removed scipy import to avoid heavy dependency/runtime requirement
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 
@@ -296,6 +297,55 @@ class TechnicalAnalysisAgent:
         
         plt.tight_layout()
         plt.show()
+
+    def generate_technical_analysis_png(self, figsize: Tuple[int, int] = (15, 12)) -> bytes:
+        """Generate technical analysis chart as PNG bytes (no display)."""
+        fig, axes = plt.subplots(4, 1, figsize=figsize, height_ratios=[3, 1, 1, 1])
+        fig.suptitle(f'{self.symbol} - Technical Analysis', fontsize=16, fontweight='bold')
+
+        # Price and Moving Averages
+        ax1 = axes[0]
+        ax1.plot(self.data.index, self.data['Close'], label='Close Price', linewidth=2, color='black')
+        ax1.plot(self.data.index, self.indicators['SMA_20'], label='SMA 20', alpha=0.7)
+        ax1.plot(self.data.index, self.indicators['SMA_50'], label='SMA 50', alpha=0.7)
+        ax1.plot(self.data.index, self.indicators['SMA_200'], label='SMA 200', alpha=0.7)
+        ax1.fill_between(self.data.index, self.indicators['BB_Upper'], self.indicators['BB_Lower'], 
+                         alpha=0.2, color='gray', label='Bollinger Bands')
+        ax1.set_title('Price Action with Moving Averages & Bollinger Bands')
+        ax1.legend(); ax1.grid(True, alpha=0.3)
+
+        # RSI
+        ax2 = axes[1]
+        ax2.plot(self.data.index, self.indicators['RSI'], color='purple', linewidth=2)
+        ax2.axhline(y=70, color='r', linestyle='--', alpha=0.7, label='Overbought')
+        ax2.axhline(y=30, color='g', linestyle='--', alpha=0.7, label='Oversold')
+        ax2.fill_between(self.data.index, 30, 70, alpha=0.1, color='gray')
+        ax2.set_title('RSI (14)'); ax2.set_ylabel('RSI'); ax2.legend(); ax2.grid(True, alpha=0.3); ax2.set_ylim(0, 100)
+
+        # MACD
+        ax3 = axes[2]
+        ax3.plot(self.data.index, self.indicators['MACD'], label='MACD', color='blue')
+        ax3.plot(self.data.index, self.indicators['Signal'], label='Signal', color='red')
+        ax3.bar(self.data.index, self.indicators['Histogram'], alpha=0.3, color='green', label='Histogram')
+        ax3.set_title('MACD'); ax3.legend(); ax3.grid(True, alpha=0.3)
+
+        # Volume
+        ax4 = axes[3]
+        ax4.bar(self.data.index, self.data['Volume'], alpha=0.7, color='orange')
+        ax4.plot(self.data.index, self.indicators['Volume_SMA'], color='red', linewidth=2, label='Volume SMA')
+        ax4.set_title('Volume'); ax4.legend(); ax4.grid(True, alpha=0.3)
+
+        for ax in axes:
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.xaxis.set_major_locator(mdates.MonthLocator())
+            plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+
+        plt.tight_layout()
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
     
     def plot_forecast(self, forecast_data: Dict, figsize: Tuple[int, int] = (12, 6)):
         """Plot price forecast"""
@@ -325,6 +375,29 @@ class TechnicalAnalysisAgent:
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.show()
+
+    def generate_forecast_png(self, forecast_data: Dict, figsize: Tuple[int, int] = (12, 6)) -> bytes:
+        """Generate forecast plot as PNG bytes (no display)."""
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.plot(self.data.index, self.data['Close'], label='Historical Prices', color='blue', linewidth=2)
+        last_date = self.data.index[-1]
+        forecast_dates = pd.date_range(start=last_date + timedelta(days=1), 
+                                       periods=forecast_data['days'], freq='D')
+        ax.plot(forecast_dates, forecast_data['forecast_prices'], 
+                label=f'Forecast ({forecast_data["trend"]})', 
+                color='red', linewidth=2, linestyle='--')
+        ax.axvline(x=last_date, color='gray', linestyle=':', alpha=0.7, label='Forecast Start')
+        ax.set_title(f'{self.symbol} - Price Forecast (R² = {forecast_data["confidence"]:.3f})')
+        ax.set_ylabel('Price ($)')
+        ax.legend(); ax.grid(True, alpha=0.3)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
     
     def get_analysis_summary(self) -> Dict:
         """Get a comprehensive analysis summary"""
