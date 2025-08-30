@@ -1,6 +1,9 @@
 from flask import Flask, request, render_template_string, jsonify
 import os
 import sys
+import threading
+import time
+import uuid
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
@@ -9,12 +12,15 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from main import run_all_agents_and_store, get_vectorstore, answer_question_with_rag
+from main import run_research_and_fundamental_agents, run_technical_analysis_only, get_vectorstore, answer_question_with_rag
 import markdown as md
 
 load_dotenv()
 
 app = Flask(__name__)
+
+# Global storage for background tasks
+background_tasks = {}
 
 INDEX_HTML = """
 <!doctype html>
@@ -39,8 +45,42 @@ INDEX_HTML = """
       .report h2 { margin-top: 0; }
       .report h3 { margin-top: 1rem; }
       .report ul { padding-left: 1.25rem; }
+      .loading { 
+        display: inline-block; 
+        width: 20px; 
+        height: 20px; 
+        border: 3px solid #f3f3f3; 
+        border-top: 3px solid #0b6cff; 
+        border-radius: 50%; 
+        animation: spin 1s linear infinite; 
+        margin-right: 10px;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .status-bar {
+        background: #f8f9fa;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin: 1rem 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .charts-container {
+        margin-top: 1rem;
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fafafa;
+      }
     </style>
     <script>
+      let currentTaskId = null;
+      let chartCheckInterval = null;
+
       document.addEventListener('DOMContentLoaded', function() {
         const form = document.getElementById('askForm');
         if (form) {
@@ -75,7 +115,68 @@ INDEX_HTML = """
             }
           });
         }
+
+        // Check for chart updates if we have a task ID
+        if (currentTaskId) {
+          startChartPolling();
+        }
       });
+
+      function startChartPolling() {
+        if (chartCheckInterval) {
+          clearInterval(chartCheckInterval);
+        }
+        
+        chartCheckInterval = setInterval(async () => {
+          if (!currentTaskId) return;
+          
+          try {
+            const response = await fetch(`/api/chart-status/${currentTaskId}`);
+            const data = await response.json();
+            
+            if (data.status === 'completed') {
+              clearInterval(chartCheckInterval);
+              chartCheckInterval = null;
+              
+              // Update the charts section
+              const chartsContainer = document.getElementById('chartsContainer');
+              if (chartsContainer) {
+                let chartsHtml = '<h3>Technical Analysis</h3>';
+                if (data.tech_image) {
+                  chartsHtml += '<img src="data:image/png;base64,' + data.tech_image + '" />';
+                }
+                if (data.forecast_image) {
+                  chartsHtml += '<h3>Forecast</h3><img src="data:image/png;base64,' + data.forecast_image + '" />';
+                }
+                chartsContainer.innerHTML = chartsHtml;
+              }
+              
+              // Update status
+              const statusBar = document.getElementById('statusBar');
+              if (statusBar) {
+                statusBar.innerHTML = '<span>✅ Charts loaded successfully!</span>';
+              }
+            } else if (data.status === 'failed') {
+              clearInterval(chartCheckInterval);
+              chartCheckInterval = null;
+              
+              const statusBar = document.getElementById('statusBar');
+              if (statusBar) {
+                statusBar.innerHTML = '<span>❌ Failed to load charts: ' + (data.error || 'Unknown error') + '</span>';
+              }
+            }
+          } catch (err) {
+            console.error('Error checking chart status:', err);
+          }
+        }, 2000); // Check every 2 seconds
+      }
+
+      function setCurrentTaskId(taskId) {
+        currentTaskId = taskId;
+        if (taskId) {
+          startChartPolling();
+        }
+      }
     </script>
   </head>
   <body>
@@ -93,6 +194,18 @@ INDEX_HTML = """
         <div class="card">
           <h2>Report</h2>
           <div class="report">{{ text_report_html | safe }}</div>
+
+          {% if task_id %}
+            <div id="statusBar" class="status-bar">
+              <span><div class="loading"></div>Generating technical analysis charts...</span>
+            </div>
+            
+            <div id="chartsContainer" class="charts-container">
+              <p class="muted">Charts are being generated in the background. You can ask questions while waiting!</p>
+            </div>
+            
+            <script>setCurrentTaskId('{{ task_id }}');</script>
+          {% endif %}
 
           {% if tech_image %}
             <h3>Technical Analysis</h3>
@@ -163,23 +276,60 @@ def _extract_images(text: str):
     return cleaned.strip(), tech_image, forecast_image
 
 
+def run_technical_analysis_background(task_id: str, ticker: str, persist_dir: str):
+    """Run technical analysis in background thread"""
+    try:
+        # Run technical analysis
+        tech_result = run_technical_analysis_only(ticker, persist_dir)
+        
+        # Extract images from the technical result
+        tech_text, tech_image, forecast_image = _extract_images(tech_result["tech_result"].content)
+        
+        # Store results
+        background_tasks[task_id] = {
+            'status': 'completed',
+            'tech_image': tech_image,
+            'forecast_image': forecast_image,
+            'tech_text': tech_text
+        }
+        
+    except Exception as e:
+        background_tasks[task_id] = {
+            'status': 'failed',
+            'error': str(e)
+        }
+
+
 @app.route("/run", methods=["POST"]) 
 def run_agents():
     ticker = (request.form.get("ticker") or "").strip().upper()
     if not ticker:
         return render_template_string(INDEX_HTML, report="Please provide a ticker.")
-    out = run_all_agents_and_store(ticker, os.getenv("PERSIST_DIR", "./chroma_db"))
-    # Extract embedded images from the technical section if present
-    text_report, tech_image, forecast_image = _extract_images(out["report_md"]) 
-    # Convert markdown to HTML
-    text_report_html = md.markdown(text_report or "")
+    
+    # Run research and fundamental agents first (fast)
+    out = run_research_and_fundamental_agents(ticker, os.getenv("PERSIST_DIR", "./chroma_db"))
+    
+    # Convert markdown to HTML for immediate display
+    text_report_html = md.markdown(out["report_md"] or "")
+    
+    # Generate task ID for background processing
+    task_id = str(uuid.uuid4())
+    
+    # Start technical analysis in background
+    background_tasks[task_id] = {'status': 'processing'}
+    thread = threading.Thread(
+        target=run_technical_analysis_background,
+        args=(task_id, ticker, os.getenv("PERSIST_DIR", "./chroma_db"))
+    )
+    thread.daemon = True
+    thread.start()
+    
     return render_template_string(
         INDEX_HTML,
         report=True,
         text_report_html=text_report_html,
         ticker=ticker,
-        tech_image=tech_image,
-        forecast_image=forecast_image,
+        task_id=task_id
     )
 
 
@@ -208,6 +358,14 @@ def api_ask():
         "answer": rag.get("answer", ""),
         "sources": rag.get("sources", [])
     })
+
+
+@app.route('/api/chart-status/<task_id>', methods=['GET'])
+def chart_status(task_id):
+    if task_id not in background_tasks:
+        return jsonify({"error": "Task not found"}), 404
+    
+    return jsonify(background_tasks[task_id])
 
 
 if __name__ == "__main__":

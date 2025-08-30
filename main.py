@@ -343,6 +343,31 @@ def build_report(results: List[AgentResult]) -> str:
     return "\n".join(parts).strip()
 
 
+def run_research_and_fundamental_agents(ticker: str, persist_dir: str = "./chroma_db") -> Dict[str, Any]:
+    """Run only research and fundamental agents for immediate display"""
+    results = [
+        run_search_agent(ticker),
+        run_fundamental_agent(ticker),
+    ]
+    vs = get_vectorstore(persist_dir)
+    upsert_results_to_vectorstore(vs, results)
+    return {
+        "report_md": build_report(results),
+        "vectorstore": vs,
+    }
+
+
+def run_technical_analysis_only(ticker: str, persist_dir: str = "./chroma_db") -> Dict[str, Any]:
+    """Run only technical analysis agent"""
+    result = run_technical_agent(ticker)
+    vs = get_vectorstore(persist_dir)
+    upsert_results_to_vectorstore(vs, [result])
+    return {
+        "tech_result": result,
+        "vectorstore": vs,
+    }
+
+
 def run_all_agents_and_store(ticker: str, persist_dir: str = "./chroma_db") -> Dict[str, Any]:
     results = [
         run_search_agent(ticker),

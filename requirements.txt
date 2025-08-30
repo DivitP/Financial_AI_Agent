@@ -13,3 +13,4 @@ matplotlib
 seaborn
 flask
 markdown
+scikit-learn
