@@ -23,7 +23,8 @@ Financial_AI_Agent/
 ├── agents/
 │   ├── fundamental_agent.py
 │   ├── search_agent.py
-│   └── technical_analysis_agent.py
+│   └── technical_analysis_agent.py (void - takes too long)
+│   └── ultra_fast_technical_analysis_agent.py (currently using)
 ├── chroma_db/
 │   └── vectorstore.db
 ├── frontend/
@@ -104,7 +105,4 @@ Financial_AI_Agent/
 * Add more agents (e.g., earnings call summaries, competitor comparisons).
 * Export to PDF with embedded charts.
 * Add authentication and saved workspaces.
-
-## License
-MIT License
 ---
