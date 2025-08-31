@@ -33,7 +33,7 @@ INDEX_HTML = """
     <title>Financial AI Agent</title>
     <style>
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', Arial, sans-serif; margin: 2rem; }
-      .container { max-width: 900px; margin: 0 auto; }
+      .container { max-width: 1200px; margin: 0 auto; }
       textarea { width: 100%; height: 120px; }
       input[type=text] { width: 200px; padding: 0.4rem; }
       .btn { padding: 0.6rem 1rem; background: #0b6cff; color: white; border: none; border-radius: 6px; cursor: pointer; }
@@ -85,6 +85,17 @@ INDEX_HTML = """
         border-radius: 6px;
         border: 1px solid #ddd;
       }
+      .charts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+      @media (max-width: 768px) {
+        .charts-grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
     <script>
       let currentTaskId = null;
@@ -103,10 +114,29 @@ INDEX_HTML = """
             btn.disabled = true; out.innerHTML = 'Loading...';
             try {
               const res = await fetch('/api/ask', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticker, question })
               });
+              
+              // Check if response is ok
+              if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+              }
+              
+              // Check if response is JSON
+              const contentType = res.headers.get('content-type');
+              if (!contentType || !contentType.includes('application/json')) {
+                const textResponse = await res.text();
+                throw new Error(`Expected JSON but got: ${contentType}. Response: ${textResponse.substring(0, 200)}...`);
+              }
+              
               const data = await res.json();
+              
+              if (data.error) {
+                throw new Error(data.error);
+              }
+              
               let html = '';
               if (data.answer) {
                 html += '<div class="answer">' + (data.answer || '') + '</div>';
@@ -116,9 +146,10 @@ INDEX_HTML = """
                 for (const s of data.sources) { html += '<li><a href="' + s + '" target="_blank">' + s + '</a></li>'; }
                 html += '</ul></div>';
               }
-              out.innerHTML = html || 'No answer.';
+              out.innerHTML = html || 'No answer available.';
             } catch (err) {
-              out.textContent = 'Error: ' + err;
+              console.error('Full error details:', err);
+              out.innerHTML = '<div style="color: red;">Error: ' + err.message + '</div>';
             } finally {
               btn.disabled = false;
             }
@@ -176,19 +207,36 @@ INDEX_HTML = """
                     chartsHtml += '<div class="chart-section"><h4>Analysis Summary</h4><pre style="white-space: pre-wrap; font-family: monospace;">' + data.tech_text + '</pre></div>';
                   }
                   
+                  // Create charts grid
+                  chartsHtml += '<div class="charts-grid">';
+                  
                   // Add technical chart
                   if (data.tech_image) {
-                    chartsHtml += '<div class="chart-section"><h4>Technical Chart</h4>';
+                    chartsHtml += '<div class="chart-section"><h4>Technical Indicators</h4>';
                     chartsHtml += '<img src="data:image/png;base64,' + data.tech_image + '" style="max-width: 100%;" /></div>';
                   }
                   
-                  // Add forecast chart
-                  if (data.forecast_image) {
-                    chartsHtml += '<div class="chart-section"><h4>Price Forecast</h4>';
-                    chartsHtml += '<img src="data:image/png;base64,' + data.forecast_image + '" style="max-width: 100%;" /></div>';
+                  // Add Bollinger Bands chart
+                  if (data.bollinger_image) {
+                    chartsHtml += '<div class="chart-section"><h4>Bollinger Bands Analysis</h4>';
+                    chartsHtml += '<img src="data:image/png;base64,' + data.bollinger_image + '" style="max-width: 100%;" /></div>';
                   }
                   
-                  if (!data.tech_text && !data.tech_image && !data.forecast_image) {
+                  // Add ARIMA forecast chart
+                  if (data.arima_image) {
+                    chartsHtml += '<div class="chart-section"><h4>ARIMA Price Forecast</h4>';
+                    chartsHtml += '<img src="data:image/png;base64,' + data.arima_image + '" style="max-width: 100%;" /></div>';
+                  }
+                  
+                  // Add GARCH volatility chart
+                  if (data.garch_image) {
+                    chartsHtml += '<div class="chart-section"><h4>GARCH Volatility Forecast</h4>';
+                    chartsHtml += '<img src="data:image/png;base64,' + data.garch_image + '" style="max-width: 100%;" /></div>';
+                  }
+                  
+                  chartsHtml += '</div>'; // Close charts-grid
+                  
+                  if (!data.tech_text && !data.tech_image && !data.bollinger_image && !data.arima_image && !data.garch_image) {
                     chartsHtml += '<p class="muted">Technical analysis completed but no results available.</p>';
                   }
                   
@@ -196,7 +244,7 @@ INDEX_HTML = """
                 }
                 
                 // Update status
-                statusBar.innerHTML = '<span>✅ Technical analysis complete!</span>';
+                statusBar.innerHTML = '<span>✅ Advanced technical analysis complete!</span>';
               } else if (data.status === 'failed') {
                 clearInterval(chartCheckInterval);
                 chartCheckInterval = null;
@@ -225,25 +273,25 @@ INDEX_HTML = """
   </head>
   <body>
     <div class="container">
-      <h1>Financial AI Agent</h1>
-      <p class="muted">Enter a stock or ETF ticker to generate a report, then ask follow-up questions via RAG.</p>
+      <h1>Advanced Financial AI Agent</h1>
+      <p class="muted">Enter a stock or ETF ticker to generate comprehensive analysis with ARIMA/GARCH forecasting and technical indicators.</p>
 
       <form method="POST" action="/run">
         <label>Ticker</label>
         <input type="text" name="ticker" value="" />
-        <button class="btn" type="submit">Generate Report</button>
+        <button class="btn" type="submit">Generate Advanced Report</button>
       </form>
 
       {% if report %}
         <div class="card">
-          <h2>Report</h2>
+          <h2>Fundamental Analysis Report</h2>
           <div class="report">{{ text_report_html | safe }}</div>
 
           {% if task_id %}
             <div id="statusBar" class="status-bar">
               <div style="width: 100%;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                  <span><div class="loading"></div>Initializing technical analysis...</span>
+                  <span><div class="loading"></div>Initializing advanced technical analysis...</span>
                   <span>0%</span>
                 </div>
                 <div style="width: 100%; background: #e5e7eb; border-radius: 4px; height: 8px;">
@@ -253,19 +301,10 @@ INDEX_HTML = """
             </div>
             
             <div id="chartsContainer" class="charts-container">
-              <p class="muted">Technical analysis is running in the background. Charts and forecasts will appear here when ready!</p>
+              <p class="muted">Advanced technical analysis with ARIMA/GARCH forecasting is running. Charts will appear here when ready!</p>
             </div>
             
             <script>setCurrentTaskId('{{ task_id }}');</script>
-          {% endif %}
-
-          {% if tech_image %}
-            <h3>Technical Analysis</h3>
-            <img src="data:image/png;base64,{{ tech_image }}" />
-          {% endif %}
-          {% if forecast_image %}
-            <h3>Forecast</h3>
-            <img src="data:image/png;base64,{{ forecast_image }}" />
           {% endif %}
         </div>
       {% endif %}
@@ -275,7 +314,7 @@ INDEX_HTML = """
         <form id="askForm">
           <input id="tickerHidden" type="hidden" name="ticker" value="{{ ticker or '' }}" />
           <label>Your question</label>
-          <textarea id="questionInput" name="question" placeholder="e.g., How are analyst estimates trending?"></textarea>
+          <textarea id="questionInput" name="question" placeholder="e.g., What do the ARIMA and GARCH models predict for volatility?"></textarea>
           <button id="askBtn" class="btn" type="submit">Search Knowledge Base</button>
         </form>
         <div id="answerContainer" class="card" style="margin-top: 1rem;"></div>
@@ -303,84 +342,88 @@ INDEX_HTML = """
 """
 
 def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str):
-    """Run optimized technical analysis with the UltraFastTechnicalAnalysisAgent"""
+    """Run comprehensive technical analysis with ARIMA, GARCH, and Bollinger Bands"""
     try:
         background_tasks[task_id] = {
             'status': 'processing',
-            'progress': 10,
-            'current_step': 'Starting technical analysis...'
+            'progress': 5,
+            'current_step': 'Starting advanced technical analysis...'
         }
         
-        print(f"Starting technical analysis for {ticker}")
+        print(f"Starting comprehensive technical analysis for {ticker}")
         
-        # Import the ultra-fast analysis function directly
+        # Import the enhanced analysis function
         try:
             background_tasks[task_id].update({
-                'progress': 20,
-                'current_step': 'Importing analysis module...'
+                'progress': 15,
+                'current_step': 'Importing enhanced analysis module...'
             })
             
-            # Import the run_ultra_fast_analysis function from the module
-            from agents.ultra_fast_technical_agent import run_ultra_fast_analysis
+            # Import the enhanced run_ultra_fast_analysis function
+            from agents.ultra_fast_technical_agent import run_enhanced_analysis
             
             background_tasks[task_id].update({
-                'progress': 40,
-                'current_step': 'Running comprehensive analysis...'
+                'progress': 30,
+                'current_step': 'Running comprehensive analysis with ARIMA/GARCH...'
             })
             
-            # Run the full analysis which includes charts and forecasts
-            result = run_ultra_fast_analysis(ticker)
+            # Run the enhanced analysis which includes all charts
+            result = run_enhanced_analysis(ticker)
             
             background_tasks[task_id].update({
-                'progress': 80,
-                'current_step': 'Processing results...'
+                'progress': 70,
+                'current_step': 'Processing all forecast models...'
             })
             
-            # Extract results
+            # Extract all results
             tech_text = result.get('text', '')
             tech_image = result.get('tech_image')
-            forecast_image = result.get('forecast_image')
+            bollinger_image = result.get('bollinger_image')
+            arima_image = result.get('arima_image')
+            garch_image = result.get('garch_image')
             
-            print(f"Analysis completed - Text: {bool(tech_text)}, Tech Chart: {bool(tech_image)}, Forecast Chart: {bool(forecast_image)}")
+            print(f"Enhanced analysis completed - Text: {bool(tech_text)}, Tech: {bool(tech_image)}, BB: {bool(bollinger_image)}, ARIMA: {bool(arima_image)}, GARCH: {bool(garch_image)}")
             
             background_tasks[task_id].update({
-                'progress': 90,
+                'progress': 85,
                 'current_step': 'Updating knowledge base...'
             })
             
-            # Update vectorstore with the analysis
+            # Update vectorstore with the comprehensive analysis
             try:
                 vs = get_vectorstore(persist_dir)
                 from main import AgentResult
                 result_obj = AgentResult(
-                    name="technical", 
+                    name="advanced_technical", 
                     ticker=ticker, 
                     content=tech_text, 
-                    sources=["https://finance.yahoo.com/"]
+                    sources=["https://finance.yahoo.com/", "ARIMA Model", "GARCH Model"]
                 )
                 upsert_results_to_vectorstore(vs, [result_obj])
-                print("Successfully updated vectorstore")
+                print("Successfully updated vectorstore with advanced analysis")
             except Exception as e:
                 print(f"Vectorstore update failed: {e}")
             
-            # Store final results
+            # Store final results with all charts
             background_tasks[task_id] = {
                 'status': 'completed',
                 'progress': 100,
-                'current_step': 'Analysis complete!',
+                'current_step': 'Advanced analysis complete!',
                 'tech_image': tech_image,
-                'forecast_image': forecast_image,
+                'bollinger_image': bollinger_image,
+                'arima_image': arima_image,
+                'garch_image': garch_image,
                 'tech_text': tech_text
             }
             
-            print(f"Technical analysis completed successfully for {ticker}")
+            print(f"Advanced technical analysis completed successfully for {ticker}")
             
         except ImportError as e:
-            print(f"Import error for ultra_fast_technical_agent: {e}")
-            # Fallback to simplified analysis
+            print(f"Import error for enhanced analysis: {e}")
+            # Fallback to original analysis
             background_tasks[task_id].update({
                 'progress': 50,
-                'current_step': 'Using simplified analysis (import failed)...'
+                'current_step': 'Using standard analysis (enhanced module not found)...'
             })
             
             fallback_result = ultra_simple_analysis(ticker)
@@ -388,15 +431,16 @@ def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str
             background_tasks[task_id] = {
                 'status': 'completed',
                 'progress': 100,
-                'current_step': 'Simplified analysis complete!',
+                'current_step': 'Standard analysis complete!',
                 'tech_image': None,
-                'forecast_image': None,
+                'bollinger_image': None,
+                'arima_image': None,
+                'garch_image': None,
                 'tech_text': fallback_result['text']
             }
             
         except Exception as e:
-            print(f"Analysis execution failed: {str(e)}")
-            # Another fallback attempt
+            print(f"Enhanced analysis execution failed: {str(e)}")
             background_tasks[task_id].update({
                 'progress': 50,
                 'current_step': 'Analysis failed, using fallback...'
@@ -409,7 +453,9 @@ def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str
                 'progress': 100,
                 'current_step': 'Fallback analysis complete!',
                 'tech_image': None,
-                'forecast_image': None,
+                'bollinger_image': None,
+                'arima_image': None,
+                'garch_image': None,
                 'tech_text': fallback_result['text']
             }
             
@@ -422,7 +468,9 @@ def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str
             'progress': 0,
             'current_step': f'Analysis failed: {error_msg}',
             'tech_image': None,
-            'forecast_image': None,
+            'bollinger_image': None,
+            'arima_image': None,
+            'garch_image': None,
             'tech_text': f"Technical analysis unavailable: {error_msg}",
             'error': error_msg
         }
@@ -448,25 +496,29 @@ def ultra_simple_analysis(ticker: str) -> Dict:
         sma_20 = data['Close'].tail(20).mean() if len(data) >= 20 else data['Close'].mean()
         trend = "Bullish" if sma_5 > sma_20 else "Bearish"
         
-        text = f"""ULTRA-SIMPLE TECHNICAL ANALYSIS - {ticker}
+        text = f"""SIMPLE TECHNICAL ANALYSIS - {ticker}
 Current Price: ${current_price:.2f}
 Daily Change: ${price_change:+.2f} ({price_change_pct:+.2f}%)
 Short-term Trend: {trend}
 Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
-Note: This is a minimal analysis due to system constraints."""
+Note: Enhanced analysis with ARIMA/GARCH models unavailable due to system constraints."""
         
         return {
             'text': text.strip(),
             'tech_image': None,
-            'forecast_image': None
+            'bollinger_image': None,
+            'arima_image': None,
+            'garch_image': None
         }
         
     except Exception as e:
         return {
             'text': f"Unable to perform technical analysis for {ticker}: {str(e)}",
             'tech_image': None,
-            'forecast_image': None
+            'bollinger_image': None,
+            'arima_image': None,
+            'garch_image': None
         }
 
 @app.route("/", methods=["GET"]) 
@@ -488,7 +540,7 @@ def run_agents():
     # Generate task ID for background processing
     task_id = str(uuid.uuid4())
     
-    # Start optimized technical analysis in background
+    # Start enhanced technical analysis in background
     background_tasks[task_id] = {'status': 'processing'}
     thread = threading.Thread(
         target=run_optimized_technical_analysis,
@@ -518,17 +570,41 @@ def ask():
 
 @app.route('/api/ask', methods=['POST'])
 def api_ask():
-    data = request.get_json(force=True) or {}
-    ticker = (data.get('ticker') or '').strip().upper()
-    question = (data.get('question') or '').strip()
-    if not question:
-        return jsonify({"error": "Missing question"}), 400
-    vs = get_vectorstore(os.getenv("PERSIST_DIR", "./chroma_db"))
-    rag = answer_question_with_rag(vs, ticker, question, k=6)
-    return jsonify({
-        "answer": rag.get("answer", ""),
-        "sources": rag.get("sources", [])
-    })
+    try:
+        # Get JSON data with better error handling
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+            
+        ticker = (data.get('ticker') or '').strip().upper()
+        question = (data.get('question') or '').strip()
+        
+        if not question:
+            return jsonify({"error": "Missing question"}), 400
+            
+        if not ticker:
+            return jsonify({"error": "Missing ticker"}), 400
+        
+        print(f"API Ask - Ticker: {ticker}, Question: {question}")
+        
+        # Get vectorstore and perform RAG
+        vs = get_vectorstore(os.getenv("PERSIST_DIR", "./chroma_db"))
+        rag = answer_question_with_rag(vs, ticker, question, k=6)
+        
+        # Ensure we return valid JSON
+        response_data = {
+            "answer": rag.get("answer", "No answer available"),
+            "sources": rag.get("sources", [])
+        }
+        
+        print(f"API Ask Response: {len(response_data['answer'])} chars, {len(response_data['sources'])} sources")
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"API Ask Error: {error_msg}")
+        return jsonify({"error": f"Server error: {error_msg}"}), 500
 
 @app.route('/api/chart-status/<task_id>', methods=['GET'])
 def chart_status(task_id):
