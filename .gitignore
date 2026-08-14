@@ -1,2 +1,57 @@
-#enviroment variables
+# Secrets and local configuration
 .env
+.env.*
+!.env.example
+
+# Python environments and generated files
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+site/
+build/
+dist/
+*.egg-info/
+
+# Application runtime data, caches, and downloaded models
+chroma_db/
+data/runtime/
+artifacts/
+.cache/
+.uv-cache/
+.embeddings_cache/
+.models/
+models/
+huggingface/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Generated reports and charts
+reports/
+exports/
+charts/
+*.png
+!workflow/*.png
+*.pdf
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+node_modules/
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/

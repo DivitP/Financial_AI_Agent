@@ -10,10 +10,21 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.tools import DuckDuckGoSearchRun
 from newspaper import Article
+from settings import get_settings
 
 load_dotenv()
+settings = get_settings()
 
-llm = ChatGroq(temperature=0, model_name="llama3-70b-8192", api_key=os.getenv("GROQ_API_KEY"))
+
+class DisabledAgentExecutor:
+    """Fail at request time when an optional legacy provider is disabled."""
+
+    def __init__(self, provider: str, instructions: str) -> None:
+        self.provider = provider
+        self.instructions = instructions
+
+    def invoke(self, _: dict) -> dict:
+        raise RuntimeError(f"{self.provider} is disabled. {self.instructions}")
 
 @tool
 def search_web(query: str) -> str:
@@ -83,8 +94,19 @@ prompt = ChatPromptTemplate.from_messages(
     ]
 )
 
-agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=10)
+if settings.enable_groq:
+    llm = ChatGroq(
+        temperature=0,
+        model_name=settings.groq_model,
+        api_key=settings.groq_api_key.get_secret_value() if settings.groq_api_key else None,
+    )
+    agent = create_tool_calling_agent(llm, tools, prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=10)
+else:
+    agent_executor = DisabledAgentExecutor(
+        "The Groq research agent",
+        "Set ENABLE_GROQ=true and provide GROQ_API_KEY in .env to use live research.",
+    )
 
 def run_agent(user_prompt):
     print(f"Running agent for query: {user_prompt}\n")

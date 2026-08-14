@@ -11,13 +11,23 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from dotenv import load_dotenv
+from settings import get_settings
 
 load_dotenv()
+settings = get_settings()
 
-groq_api_key = os.getenv("GROQ_API_KEY")
+groq_api_key = settings.groq_api_key.get_secret_value() if settings.groq_api_key else None
 fmp_api_key = os.getenv("FMP_API_KEY")
 
-llm = ChatGroq(temperature=0, groq_api_key=groq_api_key, model_name="llama3-70b-8192")
+
+class DisabledAgentExecutor:
+    """Fail at request time when the optional legacy Groq provider is disabled."""
+
+    def invoke(self, _: dict) -> dict:
+        raise RuntimeError(
+            "The Groq fundamental agent is disabled. Set ENABLE_GROQ=true and provide "
+            "GROQ_API_KEY in .env to use live research."
+        )
 
 def fmp_request(endpoint, symbol, params=None):
     """Make request to FMP API"""
@@ -382,14 +392,18 @@ tools = [
     get_yfinance_info
 ]
 
-agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    max_iterations=10,
-    early_stopping_method="generate"
-)
+if settings.enable_groq:
+    llm = ChatGroq(temperature=0, groq_api_key=groq_api_key, model_name=settings.groq_model)
+    agent = create_tool_calling_agent(llm, tools, prompt)
+    agent_executor = AgentExecutor(
+        agent=agent,
+        tools=tools,
+        verbose=True,
+        max_iterations=10,
+        early_stopping_method="generate",
+    )
+else:
+    agent_executor = DisabledAgentExecutor()
 
 if __name__ == "__main__":
     print("Financial Modeling Prep + yfinance Stock Analysis Agent")

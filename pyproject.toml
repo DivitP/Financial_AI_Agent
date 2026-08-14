@@ -1,0 +1,100 @@
+[project]
+name = "financial-ai-agent"
+version = "0.1.0"
+description = "Evidence-first financial research application (legacy Flask baseline)"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "arch>=7.2,<9",
+    "duckduckgo-search>=6.3,<8",
+    "flask>=3.0,<4",
+    "langchain>=0.3.27,<0.4",
+    "langchain-community>=0.3.27,<0.4",
+    "langchain-core>=0.3.69,<0.4",
+    "langchain-groq>=0.2.4,<0.3",
+    "lxml[html-clean]>=5.3,<7",
+    "markdown>=3.6,<4",
+    "matplotlib>=3.9,<4",
+    "newspaper4k>=0.9.3.1,<1",
+    "numpy>=1.26,<3",
+    "pandas>=2.2,<3",
+    "pydantic-settings>=2.6,<3",
+    "python-dotenv>=1.0,<2",
+    "requests>=2.32,<3",
+    "scikit-learn>=1.5,<2",
+    "seaborn>=0.13,<1",
+    "statsmodels>=0.14.4,<1",
+    "yfinance>=0.2.54,<1",
+]
+
+[project.optional-dependencies]
+kronos = [
+    "accelerate>=1.2,<2",
+    "huggingface-hub>=0.27,<1",
+    "safetensors>=0.5,<1",
+    "torch>=2.5,<3",
+    "transformers>=4.47,<6",
+]
+local-llm = [
+    "langchain-ollama>=0.2.3,<0.4",
+    "ollama>=0.4,<1",
+]
+
+[dependency-groups]
+dev = [
+    "coverage[toml]>=7.6,<8",
+    "pre-commit>=4.0,<5",
+    "mypy>=1.14,<2",
+    "pytest>=8.3,<9",
+    "pytest-cov>=6.0,<7",
+    "ruff>=0.9,<1",
+]
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --cov=agents --cov=frontend --cov=main --cov=settings --cov-report=term-missing"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["agents", "frontend", "main", "settings"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+    ".venv",
+    "venv",
+    "chroma_db",
+    "data",
+    "artifacts",
+    "agents",
+    "frontend",
+    "main.py",
+]
+
+[tool.ruff.lint]
+# The legacy codebase is intentionally on a minimal, no-regression lint baseline.
+# This expands as modules are migrated.
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+files = ["settings.py", "tests"]
+python_version = "3.12"
+check_untyped_defs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true

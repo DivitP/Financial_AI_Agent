@@ -16,10 +16,12 @@ if ROOT_DIR not in sys.path:
 
 from main import run_research_and_fundamental_agents, get_vectorstore, answer_question_with_rag, upsert_results_to_vectorstore
 import markdown as md
+from settings import get_settings
 
 load_dotenv()
 
 app = Flask(__name__)
+settings = get_settings()
 
 # Global storage for background tasks
 background_tasks = {}
@@ -532,7 +534,7 @@ def run_agents():
         return render_template_string(INDEX_HTML, report="Please provide a ticker.")
     
     # Run research and fundamental agents first (fast)
-    out = run_research_and_fundamental_agents(ticker, os.getenv("PERSIST_DIR", "./chroma_db"))
+    out = run_research_and_fundamental_agents(ticker, str(settings.persist_dir))
     
     # Convert markdown to HTML for immediate display
     text_report_html = md.markdown(out["report_md"] or "")
@@ -544,7 +546,7 @@ def run_agents():
     background_tasks[task_id] = {'status': 'processing'}
     thread = threading.Thread(
         target=run_optimized_technical_analysis,
-        args=(task_id, ticker, os.getenv("PERSIST_DIR", "./chroma_db"))
+        args=(task_id, ticker, str(settings.persist_dir))
     )
     thread.daemon = True
     thread.start()
@@ -564,7 +566,7 @@ def ask():
     if not question:
         return render_template_string(INDEX_HTML, report=None, ticker=ticker, answer="Please enter a question.")
 
-    vs = get_vectorstore(os.getenv("PERSIST_DIR", "./chroma_db"))
+    vs = get_vectorstore(str(settings.persist_dir))
     rag = answer_question_with_rag(vs, ticker, question, k=6)
     return render_template_string(INDEX_HTML, report=None, ticker=ticker, answer=rag["answer"], sources=rag.get("sources", []))
 
@@ -588,7 +590,7 @@ def api_ask():
         print(f"API Ask - Ticker: {ticker}, Question: {question}")
         
         # Get vectorstore and perform RAG
-        vs = get_vectorstore(os.getenv("PERSIST_DIR", "./chroma_db"))
+        vs = get_vectorstore(str(settings.persist_dir))
         rag = answer_question_with_rag(vs, ticker, question, k=6)
         
         # Ensure we return valid JSON
@@ -614,4 +616,4 @@ def chart_status(task_id):
     return jsonify(background_tasks[task_id])
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8501)), debug=True)
+    app.run(host=settings.host, port=settings.port, debug=settings.debug)
