@@ -36,7 +36,7 @@ def _records():
 def test_migrations_upgrade_and_downgrade_empty_database(tmp_path) -> None:
     database = Database(tmp_path / "research.db")
     database.migrate_to_latest()
-    assert database.current_version() == 1
+    assert database.current_version() == 2
 
     database.migrate_to(0)
     assert database.current_version() == 0

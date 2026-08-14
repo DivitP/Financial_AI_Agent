@@ -161,4 +161,42 @@ def _downgrade_0001(connection: sqlite3.Connection) -> None:
     )
 
 
-MIGRATIONS = (Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),)
+def _upgrade_0002(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE job_steps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL REFERENCES jobs(id),
+            lane TEXT NOT NULL,
+            status TEXT NOT NULL,
+            percentage INTEGER NOT NULL,
+            warning TEXT,
+            retry_at TEXT,
+            updated_at TEXT NOT NULL,
+            UNIQUE(job_id, lane)
+        );
+        CREATE TABLE job_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id TEXT NOT NULL REFERENCES jobs(id),
+            kind TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX idx_job_events_job_id_id ON job_events(job_id, id);
+        """
+    )
+
+
+def _downgrade_0002(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        DROP TABLE IF EXISTS job_events;
+        DROP TABLE IF EXISTS job_steps;
+        """
+    )
+
+
+MIGRATIONS = (
+    Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
+    Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
+)
