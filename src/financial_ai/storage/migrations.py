@@ -216,8 +216,32 @@ def _downgrade_0003(connection: sqlite3.Connection) -> None:
     )
 
 
+def _upgrade_0004(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE research_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES research_runs(id),
+            lane TEXT NOT NULL,
+            status TEXT NOT NULL,
+            payload_json TEXT,
+            error_message TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(run_id, lane)
+        );
+        CREATE INDEX idx_research_snapshots_run_id ON research_snapshots(run_id);
+        """
+    )
+
+
+def _downgrade_0004(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE IF EXISTS research_snapshots")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
     Migration(3, "evidence_source_quality", _upgrade_0003, _downgrade_0003),
+    Migration(4, "initial_research_snapshots", _upgrade_0004, _downgrade_0004),
 )

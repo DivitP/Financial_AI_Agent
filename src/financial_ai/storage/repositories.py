@@ -81,6 +81,61 @@ class ResearchRepository:
             ),
         )
 
+    def update_run_status(
+        self, run_id: UUID, status: str, connection: sqlite3.Connection | None = None
+    ) -> None:
+        self._execute(
+            connection,
+            "UPDATE research_runs SET status = ? WHERE id = ?",
+            (status, _id(run_id)),
+        )
+
+    def get_run(self, run_id: UUID) -> sqlite3.Row | None:
+        with self.database.connect() as connection:
+            return connection.execute(
+                """
+                SELECT research_runs.*, instruments.symbol
+                FROM research_runs JOIN instruments ON instruments.id = research_runs.instrument_id
+                WHERE research_runs.id = ?
+                """,
+                (_id(run_id),),
+            ).fetchone()
+
+    def upsert_snapshot(
+        self,
+        run_id: UUID,
+        lane: str,
+        status: str,
+        payload: dict[str, object] | None,
+        error_message: str | None = None,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
+        now = datetime.now().astimezone().isoformat()
+        self._execute(
+            connection,
+            """
+            INSERT INTO research_snapshots(run_id, lane, status, payload_json, error_message, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id, lane) DO UPDATE SET status=excluded.status, payload_json=excluded.payload_json,
+                error_message=excluded.error_message, updated_at=excluded.updated_at
+            """,
+            (
+                _id(run_id),
+                lane,
+                status,
+                json.dumps(payload, sort_keys=True) if payload else None,
+                error_message,
+                now,
+                now,
+            ),
+        )
+
+    def snapshots(self, run_id: UUID) -> list[sqlite3.Row]:
+        with self.database.connect() as connection:
+            return connection.execute(
+                "SELECT * FROM research_snapshots WHERE run_id = ? ORDER BY id", (_id(run_id),)
+            ).fetchall()
+
     def add_evidence(
         self, evidence: Evidence, connection: sqlite3.Connection | None = None
     ) -> None:

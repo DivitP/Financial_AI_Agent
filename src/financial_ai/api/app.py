@@ -24,6 +24,8 @@ from financial_ai.api.schemas import (
     CreateResearchJobRequest,
     HealthResponse,
     JobResponse,
+    ResearchRunResponse,
+    ResearchSnapshotResponse,
     VersionResponse,
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
@@ -106,6 +108,97 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         logger.info("research job queued", extra={"correlation_id": request.state.correlation_id})
         return _job_response(job, request.state.correlation_id)
 
+    @app.post(
+        "/api/v1/research-runs",
+        response_model=ResearchRunResponse,
+        status_code=202,
+        tags=["research"],
+    )
+    def create_research_run(
+        payload: CreateResearchJobRequest, request: Request
+    ) -> ResearchRunResponse:
+        instrument = Instrument(
+            id=uuid4(), symbol=payload.ticker, asset_type=AssetType.EQUITY, currency="USD"
+        )
+        run = ResearchRun(
+            id=uuid4(),
+            instrument_id=instrument.id,
+            requested_at=datetime.now(UTC),
+            provider_config_version="initial-research-v1",
+        )
+        with database.transaction() as connection:
+            repository.add_instrument(instrument, connection)
+            repository.add_run(run, connection)
+            runner.create(run.id, {"ticker": instrument.symbol}, connection)
+        return ResearchRunResponse(
+            id=run.id,
+            status=run.status.value,
+            ticker=instrument.symbol,
+            correlation_id=request.state.correlation_id,
+        )
+
+    @app.get(
+        "/api/v1/research-runs/{run_id}", response_model=ResearchRunResponse, tags=["research"]
+    )
+    def get_research_run(run_id: UUID, request: Request) -> ResearchRunResponse:
+        row = _run_or_error(repository, run_id)
+        return _run_response(row, request.state.correlation_id)
+
+    @app.get(
+        "/api/v1/research-runs/{run_id}/snapshot",
+        response_model=list[ResearchSnapshotResponse],
+        tags=["research"],
+    )
+    def get_initial_snapshot(run_id: UUID) -> list[ResearchSnapshotResponse]:
+        _run_or_error(repository, run_id)
+        return [
+            ResearchSnapshotResponse(
+                lane=row["lane"],
+                status=row["status"],
+                payload=json.loads(row["payload_json"]) if row["payload_json"] else None,
+                error_message=row["error_message"],
+            )
+            for row in repository.snapshots(run_id)
+        ]
+
+    @app.post(
+        "/api/v1/research-runs/{run_id}/cancel",
+        response_model=ResearchRunResponse,
+        tags=["research"],
+    )
+    def cancel_research_run(run_id: UUID, request: Request) -> ResearchRunResponse:
+        row = _run_or_error(repository, run_id)
+        if row["status"] not in {"pending", "running"}:
+            raise ApiError("run_not_cancellable", "Research run cannot be cancelled.", 409)
+        with database.transaction() as connection:
+            repository.update_run_status(run_id, "cancelled", connection)
+            job = connection.execute(
+                "SELECT id FROM jobs WHERE run_id=? ORDER BY created_at DESC LIMIT 1",
+                (str(run_id),),
+            ).fetchone()
+            if job:
+                connection.execute(
+                    "UPDATE jobs SET status='cancelled', updated_at=? WHERE id=?",
+                    (datetime.now(UTC).isoformat(), job["id"]),
+                )
+        return _run_response(_run_or_error(repository, run_id), request.state.correlation_id)
+
+    @app.post(
+        "/api/v1/research-runs/{run_id}/retry",
+        response_model=ResearchRunResponse,
+        tags=["research"],
+    )
+    def retry_research_run(run_id: UUID, request: Request) -> ResearchRunResponse:
+        row = _run_or_error(repository, run_id)
+        if row["status"] not in {"failed", "cancelled"}:
+            raise ApiError(
+                "run_not_retryable", "Only failed or cancelled runs can be retried.", 409
+            )
+        with database.transaction() as connection:
+            repository.update_run_status(run_id, "pending", connection)
+            runner.create(run_id, {"retry": True}, connection)
+        return _run_response(_run_or_error(repository, run_id), request.state.correlation_id)
+
     @app.post("/api/v1/research-jobs/{job_id}/run", response_model=JobResponse, tags=["research"])
     def run_research_job(job_id: UUID, request: Request) -> JobResponse:
         try:
@@ -158,4 +251,20 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
 def _job_response(job: Job, correlation_id: str) -> JobResponse:
     return JobResponse(
         id=job.id, run_id=job.run_id, status=job.status, correlation_id=correlation_id
+    )
+
+
+def _run_or_error(repository: ResearchRepository, run_id: UUID):
+    row = repository.get_run(run_id)
+    if row is None:
+        raise ApiError("run_not_found", "Research run was not found.", 404)
+    return row
+
+
+def _run_response(row, correlation_id: str) -> ResearchRunResponse:
+    return ResearchRunResponse(
+        id=UUID(row["id"]),
+        status=row["status"],
+        ticker=row["symbol"],
+        correlation_id=correlation_id,
     )

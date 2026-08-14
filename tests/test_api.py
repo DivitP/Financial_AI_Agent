@@ -66,3 +66,22 @@ def test_job_cancellation_and_recovery_are_persisted(tmp_path) -> None:
         connection.execute("UPDATE jobs SET status='running' WHERE id=?", (created["id"],))
         connection.execute("UPDATE jobs SET status='failed' WHERE id=?", (failed["id"],))
     assert {str(job_id) for job_id in runner.recover()} == {created["id"], failed["id"]}
+
+
+def test_research_run_endpoints_cover_lifecycle_states_and_snapshots(tmp_path) -> None:
+    app = create_app(tmp_path / "api.db")
+    client = TestClient(app)
+    created = client.post("/api/v1/research-runs", json={"ticker": "AAPL"})
+    run_id = created.json()["id"]
+    assert created.status_code == 202 and created.json()["status"] == "pending"
+    assert client.get(f"/api/v1/research-runs/{run_id}").json()["status"] == "pending"
+    assert client.get(f"/api/v1/research-runs/{run_id}/snapshot").json() == []
+    assert client.post(f"/api/v1/research-runs/{run_id}/cancel").json()["status"] == "cancelled"
+    assert client.post(f"/api/v1/research-runs/{run_id}/retry").json()["status"] == "pending"
+
+    for status in ("running", "completed", "failed", "cancelled"):
+        with app.state.database.transaction() as connection:
+            connection.execute("UPDATE research_runs SET status=? WHERE id=?", (status, run_id))
+        response = client.get(f"/api/v1/research-runs/{run_id}")
+        assert response.status_code == 200
+        assert response.json()["status"] == status

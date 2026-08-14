@@ -33,6 +33,20 @@ class JobResponse(ApiSchema):
     correlation_id: str
 
 
+class ResearchRunResponse(ApiSchema):
+    id: UUID
+    status: Literal["pending", "running", "completed", "failed", "cancelled"]
+    ticker: str
+    correlation_id: str
+
+
+class ResearchSnapshotResponse(ApiSchema):
+    lane: str
+    status: Literal["completed", "failed"]
+    payload: dict[str, object] | None = None
+    error_message: str | None = None
+
+
 class HealthResponse(ApiSchema):
     status: Literal["ok"]
 
