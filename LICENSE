@@ -1,0 +1,14 @@
+Financial AI Agent
+Copyright (C) 2026 Financial AI Agent contributors
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+
+This project is licensed under the GNU Affero General Public License, version
+3.0 or (at your option) any later version. You may obtain a copy of the full
+license at https://www.gnu.org/licenses/agpl-3.0.html.
+
+This license choice is intentional: the target architecture may directly use
+the AGPL-licensed OpenBB Open Data Platform. Anyone who modifies and provides
+this application as a network service must make the corresponding source
+available under the AGPL. See docs/data/provider-policy.md before adding any
+provider or distributing provider-derived data.
