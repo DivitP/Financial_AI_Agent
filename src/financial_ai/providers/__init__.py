@@ -11,6 +11,7 @@ from financial_ai.providers.contracts import (
     StatementsProvider,
 )
 from financial_ai.providers.errors import ProviderError, ProviderErrorCategory
+from financial_ai.providers.openbb import MarketDataCollection, OpenBBMarketDataAdapter
 
 __all__ = [
     "FilingsProvider",
@@ -20,6 +21,8 @@ __all__ = [
     "MarketDataProvider",
     "NewsProvider",
     "OwnershipProvider",
+    "OpenBBMarketDataAdapter",
+    "MarketDataCollection",
     "ProviderError",
     "ProviderErrorCategory",
     "StatementsProvider",
