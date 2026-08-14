@@ -49,6 +49,8 @@ charts/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+frontend/web/dist/
+frontend/web/coverage/
 node_modules/
 
 # OS and editor files

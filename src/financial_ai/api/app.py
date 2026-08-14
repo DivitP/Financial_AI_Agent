@@ -100,6 +100,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             instrument_id=instrument.id,
             requested_at=datetime.now(UTC),
             provider_config_version="local-v1",
+            scope=payload.model_dump(exclude={"ticker"}, exclude_none=True),
         )
         with database.transaction() as connection:
             repository.add_instrument(instrument, connection)
@@ -125,6 +126,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             instrument_id=instrument.id,
             requested_at=datetime.now(UTC),
             provider_config_version="initial-research-v1",
+            scope=payload.model_dump(exclude={"ticker"}, exclude_none=True),
         )
         with database.transaction() as connection:
             repository.add_instrument(instrument, connection)
@@ -160,6 +162,42 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             )
             for row in repository.snapshots(run_id)
         ]
+
+    @app.get("/api/v1/research-runs/{run_id}/events", tags=["research"])
+    async def stream_research_run(
+        run_id: UUID,
+        last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
+    ) -> StreamingResponse:
+        """Stream durable job events for a run; browser reconnects use Last-Event-ID."""
+        _run_or_error(repository, run_id)
+        try:
+            cursor = int(last_event_id or 0)
+        except ValueError as error:
+            raise ApiError("invalid_event_cursor", "Last-Event-ID must be an integer.", 422) from error
+
+        async def events() -> AsyncIterator[str]:
+            nonlocal cursor
+            while True:
+                with database.connect() as connection:
+                    rows = connection.execute(
+                        """
+                        SELECT job_events.id, job_events.kind, job_events.payload_json
+                        FROM job_events JOIN jobs ON jobs.id = job_events.job_id
+                        WHERE jobs.run_id=? AND job_events.id>? ORDER BY job_events.id
+                        """,
+                        (str(run_id), cursor),
+                    ).fetchall()
+                for event in rows:
+                    cursor = int(event["id"])
+                    yield f"id: {cursor}\nevent: {event['kind']}\ndata: {event['payload_json']}\n\n"
+                row = repository.get_run(run_id)
+                if row is None or row["status"] in {"completed", "failed", "cancelled"}:
+                    return
+                await asyncio.sleep(0.5)
+
+        return StreamingResponse(
+            events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
+        )
 
     @app.post(
         "/api/v1/research-runs/{run_id}/cancel",

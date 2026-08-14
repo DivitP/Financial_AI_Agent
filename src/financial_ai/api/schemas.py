@@ -16,6 +16,9 @@ class ApiSchema(BaseModel):
 
 class CreateResearchJobRequest(ApiSchema):
     ticker: str = Field(min_length=1, max_length=15)
+    investment_horizon: Literal["short", "medium", "long"] | None = None
+    risk_lens: Literal["conservative", "balanced", "growth"] | None = None
+    thesis: str | None = Field(default=None, max_length=500)
 
     @field_validator("ticker")
     @classmethod
@@ -24,6 +27,11 @@ class CreateResearchJobRequest(ApiSchema):
         if not re.fullmatch(r"[A-Z0-9][A-Z0-9._-]{0,14}", normalized):
             raise ValueError("ticker must contain only letters, numbers, '.', '_' or '-'")
         return normalized
+
+    @field_validator("thesis")
+    @classmethod
+    def normalize_thesis(cls, value: str | None) -> str | None:
+        return value.strip() or None if value else None
 
 
 class JobResponse(ApiSchema):

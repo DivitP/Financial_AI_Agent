@@ -1,7 +1,7 @@
 UV ?= $(if $(wildcard .venv/bin/uv),.venv/bin/uv,uv)
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: install install-all lint format typecheck test frontend-lint frontend-test frontend-build check
+.PHONY: install install-all lint format typecheck test frontend-install frontend-lint frontend-test frontend-build check
 
 install:
 	$(UV) sync --all-groups
@@ -21,15 +21,16 @@ typecheck:
 test:
 	$(PYTHON) -m pytest
 
-# The legacy frontend is Flask/Python, so these validate its Python source and
-# render tests. They will be replaced by Node-based commands with the React UI.
+frontend-install:
+	npm --prefix frontend/web install
+
 frontend-lint:
-	$(PYTHON) -m ruff check frontend
+	npm --prefix frontend/web run lint
 
 frontend-test:
-	$(PYTHON) -m pytest tests/test_frontend.py
+	npm --prefix frontend/web run test
 
 frontend-build:
-	$(PYTHON) -m compileall -q frontend
+	npm --prefix frontend/web run build
 
 check: lint format typecheck test frontend-lint frontend-test frontend-build

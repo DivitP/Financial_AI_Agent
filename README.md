@@ -40,6 +40,23 @@ Financial_AI_Agent/
 
 ## Setup
 
+### Replacement API and React research workspace
+
+The legacy Flask screen remains available while the replacement application is
+being built. The new API runs without provider keys; data collection is added
+only when a research workflow is executed.
+
+```bash
+uv run uvicorn financial_ai.api.app:create_app --factory --reload
+cd frontend/web
+npm install
+npm run dev
+```
+
+Open the workspace at `http://localhost:5173`. It proxies `/api` requests to
+the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
+`npm run build` from `frontend/web` to validate the client.
+
 1. Clone the repository:
 
    ```

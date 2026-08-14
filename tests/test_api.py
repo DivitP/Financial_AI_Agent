@@ -85,3 +85,20 @@ def test_research_run_endpoints_cover_lifecycle_states_and_snapshots(tmp_path) -
         response = client.get(f"/api/v1/research-runs/{run_id}")
         assert response.status_code == 200
         assert response.json()["status"] == status
+
+
+def test_research_run_accepts_ui_scope_and_streams_durable_events(tmp_path) -> None:
+    app = create_app(tmp_path / "api.db")
+    client = TestClient(app)
+    created = client.post(
+        "/api/v1/research-runs",
+        json={"ticker": "AAPL", "investment_horizon": "long", "risk_lens": "growth"},
+    )
+    run_id = created.json()["id"]
+    with app.state.database.connect() as connection:
+        assert '"investment_horizon": "long"' in connection.execute(
+            "SELECT scope_json FROM research_runs WHERE id=?", (run_id,)
+        ).fetchone()["scope_json"]
+    with app.state.database.transaction() as connection:
+        connection.execute("UPDATE research_runs SET status='completed' WHERE id=?", (run_id,))
+    assert "event: queued" in client.get(f"/api/v1/research-runs/{run_id}/events").text
