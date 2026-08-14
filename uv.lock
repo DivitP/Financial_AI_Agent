@@ -722,7 +722,7 @@ wheels = [
 [[package]]
 name = "financial-ai-agent"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "arch" },
     { name = "duckduckgo-search" },
