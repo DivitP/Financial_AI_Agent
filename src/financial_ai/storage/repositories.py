@@ -89,8 +89,8 @@ class ResearchRepository:
             """
             INSERT INTO evidence(
                 id, run_id, source_document_id, provider, kind, retrieved_at, locator,
-                content_hash, excerpt, raw_artifact_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                content_hash, excerpt, raw_artifact_id, source_tier, freshness, exact_url
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO NOTHING
             """,
             (
@@ -104,6 +104,9 @@ class ResearchRepository:
                 evidence.content_hash,
                 evidence.excerpt,
                 evidence.raw_artifact_id,
+                evidence.source_tier.value,
+                evidence.freshness.value,
+                str(evidence.exact_url) if evidence.exact_url else None,
             ),
         )
 

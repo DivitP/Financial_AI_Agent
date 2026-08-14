@@ -47,6 +47,20 @@ class QualitySeverity(str, Enum):
     ERROR = "error"
 
 
+class SourceTier(str, Enum):
+    PRIMARY = "primary"
+    OFFICIAL = "official"
+    REPUTABLE = "reputable"
+    DISCOVERY = "discovery"
+
+
+class Freshness(str, Enum):
+    FRESH = "fresh"
+    AGING = "aging"
+    STALE = "stale"
+    UNKNOWN = "unknown"
+
+
 class DomainModel(BaseModel):
     """Reject accidental/coerced data at persistence boundaries."""
 
@@ -128,6 +142,9 @@ class Evidence(DomainModel):
     content_hash: NonEmpty
     excerpt: str | None = None
     raw_artifact_id: str | None = None
+    source_tier: SourceTier = SourceTier.OFFICIAL
+    freshness: Freshness = Freshness.UNKNOWN
+    exact_url: AnyUrl | None = None
 
     @model_validator(mode="after")
     def validate_retrieval_time(self) -> "Evidence":

@@ -196,7 +196,28 @@ def _downgrade_0002(connection: sqlite3.Connection) -> None:
     )
 
 
+def _upgrade_0003(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        ALTER TABLE evidence ADD COLUMN source_tier TEXT NOT NULL DEFAULT 'official';
+        ALTER TABLE evidence ADD COLUMN freshness TEXT NOT NULL DEFAULT 'unknown';
+        ALTER TABLE evidence ADD COLUMN exact_url TEXT;
+        """
+    )
+
+
+def _downgrade_0003(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        ALTER TABLE evidence DROP COLUMN exact_url;
+        ALTER TABLE evidence DROP COLUMN freshness;
+        ALTER TABLE evidence DROP COLUMN source_tier;
+        """
+    )
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
+    Migration(3, "evidence_source_quality", _upgrade_0003, _downgrade_0003),
 )
