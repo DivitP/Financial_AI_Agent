@@ -21,16 +21,34 @@ class ProviderModel(BaseModel):
 T = TypeVar("T")
 
 
+class Provenance(ProviderModel):
+    provider: str
+    source_url: str
+    retrieved_at: datetime
+    terms_classification: str
+
+    @model_validator(mode="after")
+    def has_timezone(self) -> "Provenance":
+        if self.retrieved_at.tzinfo is None or self.retrieved_at.utcoffset() is None:
+            raise ValueError("retrieved_at must include a timezone offset")
+        return self
+
+
 class ProviderResult(ProviderModel, Generic[T]):
     provider: str
     data: T | None = None
     error: ProviderError | None = None
     as_of: datetime | None = None
+    provenance: list[Provenance] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def has_exactly_one_outcome(self) -> "ProviderResult[T]":
         if (self.data is None) == (self.error is None):
             raise ValueError("provider result requires exactly one of data or error")
+        if self.data is not None and not self.provenance:
+            raise ValueError("successful provider result requires provenance")
+        if self.as_of is not None and (self.as_of.tzinfo is None or self.as_of.utcoffset() is None):
+            raise ValueError("as_of must include a timezone offset")
         return self
 
 

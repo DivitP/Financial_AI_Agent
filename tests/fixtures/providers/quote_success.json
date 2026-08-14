@@ -1,0 +1,16 @@
+{
+  "provider": "fixture-market",
+  "data": {
+    "symbol": "AAPL",
+    "price": 200.0
+  },
+  "as_of": "2026-08-14T12:00:00+00:00",
+  "provenance": [
+    {
+      "provider": "fixture-market",
+      "source_url": "https://example.test/quotes/AAPL",
+      "retrieved_at": "2026-08-14T12:00:01+00:00",
+      "terms_classification": "fixture-only"
+    }
+  ]
+}
