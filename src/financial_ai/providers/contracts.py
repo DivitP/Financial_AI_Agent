@@ -98,6 +98,39 @@ class Estimate(ProviderModel):
     analyst_count: int | None = Field(default=None, ge=0)
 
 
+class EarningsRelease(ProviderModel):
+    instrument_id: UUID
+    fiscal_period: str
+    scheduled_at: datetime
+    release_at: datetime | None = None
+    exchange: str
+    release_session: str
+    reported_eps: Decimal | None = None
+    consensus_eps: Decimal | None = None
+    reported_revenue: Decimal | None = None
+    consensus_revenue: Decimal | None = None
+
+
+class PublicConsensus(ProviderModel):
+    instrument_id: UUID
+    as_of: datetime
+    recommendation_counts: dict[str, int]
+    mean_target: Decimal | None = None
+    low_target: Decimal | None = None
+    high_target: Decimal | None = None
+    analyst_count: int | None = Field(default=None, ge=0)
+    revision_direction: str
+
+
+class PublicAnalystAction(ProviderModel):
+    instrument_id: UUID
+    firm: str
+    action: str
+    published_at: datetime
+    source_url: str
+    target_price: Decimal | None = None
+
+
 class NewsItem(ProviderModel):
     url: str
     headline: str
@@ -154,6 +187,22 @@ class FilingsProvider(Protocol):
 
 class EstimatesProvider(Protocol):
     async def estimates(self, instrument: InstrumentProfile) -> ProviderResult[list[Estimate]]: ...
+
+
+class EarningsProvider(Protocol):
+    async def earnings(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[list[EarningsRelease]]: ...
+
+
+class PublicAnalystProvider(Protocol):
+    async def public_consensus(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[PublicConsensus]: ...
+
+    async def public_actions(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[list[PublicAnalystAction]]: ...
 
 
 class NewsProvider(Protocol):
