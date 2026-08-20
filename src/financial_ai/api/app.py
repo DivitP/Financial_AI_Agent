@@ -173,7 +173,9 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         try:
             cursor = int(last_event_id or 0)
         except ValueError as error:
-            raise ApiError("invalid_event_cursor", "Last-Event-ID must be an integer.", 422) from error
+            raise ApiError(
+                "invalid_event_cursor", "Last-Event-ID must be an integer.", 422
+            ) from error
 
         async def events() -> AsyncIterator[str]:
             nonlocal cursor

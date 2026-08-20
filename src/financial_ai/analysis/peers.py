@@ -24,7 +24,9 @@ class PeerUniverse:
     def symbols(self) -> tuple[str, ...]:
         removed = {symbol.upper() for symbol in self.remove_symbols}
         ordered = [*self.default_symbols, *self.add_symbols]
-        return tuple(dict.fromkeys(symbol.upper() for symbol in ordered if symbol.upper() not in removed))
+        return tuple(
+            dict.fromkeys(symbol.upper() for symbol in ordered if symbol.upper() not in removed)
+        )
 
 
 @dataclass(frozen=True)
@@ -36,12 +38,18 @@ class ComparableResult:
     peer_count: int
 
 
-def compare_company(target: PeerCompany, peers: list[PeerCompany], metrics: tuple[str, ...]) -> list[ComparableResult]:
+def compare_company(
+    target: PeerCompany, peers: list[PeerCompany], metrics: tuple[str, ...]
+) -> list[ComparableResult]:
     """Percentile is the share of valid peer observations at or below the target."""
     results: list[ComparableResult] = []
     for metric in metrics:
         value = target.metrics.get(metric)
         values = sorted(peer.metrics[metric] for peer in peers if metric in peer.metrics)
-        percentile = sum(candidate <= value for candidate in values) / len(values) if value is not None and values else None
+        percentile = (
+            sum(candidate <= value for candidate in values) / len(values)
+            if value is not None and values
+            else None
+        )
         results.append(ComparableResult(target.symbol, metric, value, percentile, len(values)))
     return results

@@ -96,9 +96,12 @@ def test_research_run_accepts_ui_scope_and_streams_durable_events(tmp_path) -> N
     )
     run_id = created.json()["id"]
     with app.state.database.connect() as connection:
-        assert '"investment_horizon": "long"' in connection.execute(
-            "SELECT scope_json FROM research_runs WHERE id=?", (run_id,)
-        ).fetchone()["scope_json"]
+        assert (
+            '"investment_horizon": "long"'
+            in connection.execute(
+                "SELECT scope_json FROM research_runs WHERE id=?", (run_id,)
+            ).fetchone()["scope_json"]
+        )
     with app.state.database.transaction() as connection:
         connection.execute("UPDATE research_runs SET status='completed' WHERE id=?", (run_id,))
     assert "event: queued" in client.get(f"/api/v1/research-runs/{run_id}/events").text

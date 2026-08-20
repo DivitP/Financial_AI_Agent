@@ -35,11 +35,19 @@ def test_fixture_research_run_completes_across_api_worker_storage_and_sse(tmp_pa
                 {"name": "Apple Inc.", "exchange": "NASDAQ", "provider": "fixture-sec"}
             ),
             "quote": lambda: lane(
-                {**fixture["data"], "retrieved_at": fixture["as_of"], "provider": fixture["provider"]}
+                {
+                    **fixture["data"],
+                    "retrieved_at": fixture["as_of"],
+                    "provider": fixture["provider"],
+                }
             ),
             "ohlcv": lambda: lane({"provider": "fixture-market", "adjustment_policy": "split"}),
-            "filings": lambda: lane({"url": "https://example.test/filings/AAPL", "provider": "fixture-sec"}),
-            "statements": lambda: lane({"provider": "fixture-sec", "period": "2026-Q2", "unit": "USD"}),
+            "filings": lambda: lane(
+                {"url": "https://example.test/filings/AAPL", "provider": "fixture-sec"}
+            ),
+            "statements": lambda: lane(
+                {"provider": "fixture-sec", "period": "2026-Q2", "unit": "USD"}
+            ),
         },
     )
     asyncio.run(workflow.run(UUID(run_id)))
@@ -48,5 +56,8 @@ def test_fixture_research_run_completes_across_api_worker_storage_and_sse(tmp_pa
     snapshot = client.get(f"/api/v1/research-runs/{run_id}/snapshot")
     assert run.json()["status"] == "completed"
     assert {item["lane"] for item in snapshot.json()} == set(workflow.required_lanes)
-    assert next(item for item in snapshot.json() if item["lane"] == "quote")["payload"]["price"] == 200.0
+    assert (
+        next(item for item in snapshot.json() if item["lane"] == "quote")["payload"]["price"]
+        == 200.0
+    )
     assert "event: queued" in client.get(f"/api/v1/research-runs/{run_id}/events").text
