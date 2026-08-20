@@ -21,7 +21,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const researchApi = {
   create: (payload: ResearchRequest) => request<ResearchRun>("/api/v1/research-runs", { method: "POST", body: JSON.stringify(payload) }),
   get: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}`),
-  snapshots: (id: string) => request<ResearchSnapshot[]>(`/api/v1/research-runs/${id}/snapshot`),
+  snapshots: async (id: string) => {
+    const result = await request<unknown>(`/api/v1/research-runs/${id}/snapshot`);
+    if (!Array.isArray(result)) throw new Error("The research service returned an invalid snapshot response.");
+    return result as ResearchSnapshot[];
+  },
   cancel: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}/cancel`, { method: "POST" }),
   retry: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}/retry`, { method: "POST" }),
 };

@@ -51,6 +51,9 @@ frontend/dist/
 frontend/coverage/
 frontend/web/dist/
 frontend/web/coverage/
+frontend/web/*.tsbuildinfo
+frontend/web/vite.config.js
+frontend/web/vite.config.d.ts
 node_modules/
 
 # OS and editor files
