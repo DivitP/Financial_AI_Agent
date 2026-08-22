@@ -791,6 +791,10 @@ openbb = [
     { name = "openbb-equity" },
     { name = "openbb-yfinance" },
 ]
+sentiment = [
+    { name = "torch" },
+    { name = "transformers" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -833,11 +837,13 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.13,<1" },
     { name = "statsmodels", specifier = ">=0.14.4,<1" },
     { name = "torch", marker = "extra == 'kronos'", specifier = ">=2.5,<3" },
+    { name = "torch", marker = "extra == 'sentiment'", specifier = ">=2.5,<3" },
     { name = "transformers", marker = "extra == 'kronos'", specifier = ">=4.47,<6" },
+    { name = "transformers", marker = "extra == 'sentiment'", specifier = ">=4.47,<6" },
     { name = "uvicorn", specifier = ">=0.30,<1" },
     { name = "yfinance", specifier = ">=1.2,<2" },
 ]
-provides-extras = ["openbb", "kronos", "local-llm"]
+provides-extras = ["openbb", "kronos", "local-llm", "sentiment"]
 
 [package.metadata.requires-dev]
 dev = [

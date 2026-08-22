@@ -13,7 +13,22 @@ from pydantic import BaseModel, ConfigDict, Field
 from financial_ai.data.http import HttpRequest, SharedHttpClient
 
 
-SUPPORTED_FORMS = {"10-K", "10-K/A", "10-Q", "10-Q/A", "8-K", "8-K/A", "4", "4/A"}
+SUPPORTED_FORMS = {
+    "10-K",
+    "10-K/A",
+    "10-Q",
+    "10-Q/A",
+    "8-K",
+    "8-K/A",
+    "4",
+    "4/A",
+    "SC 13D",
+    "SC 13D/A",
+    "SC 13G",
+    "SC 13G/A",
+    "13F-HR",
+    "13F-HR/A",
+}
 
 
 class SecCompany(BaseModel):

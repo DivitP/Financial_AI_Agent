@@ -53,6 +53,10 @@ local-llm = [
     "langchain-ollama>=0.2.3,<0.4",
     "ollama>=0.4,<1",
 ]
+sentiment = [
+    "torch>=2.5,<3",
+    "transformers>=4.47,<6",
+]
 
 [dependency-groups]
 dev = [

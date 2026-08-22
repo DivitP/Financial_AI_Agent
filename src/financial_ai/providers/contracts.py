@@ -154,6 +154,28 @@ class OwnershipRecord(ProviderModel):
     source_filing: str | None = None
 
 
+class InsiderTransaction(ProviderModel):
+    instrument_id: UUID
+    reporter: str
+    form_type: str
+    transaction_code: str
+    acquired_disposed: str
+    transaction_at: datetime | None = None
+    filed_at: datetime
+    shares: Decimal | None = None
+    planned: bool = False
+
+
+class OwnershipChange(ProviderModel):
+    instrument_id: UUID
+    reporter: str
+    form_type: str
+    filed_at: datetime
+    shares: Decimal | None = None
+    ownership_before: Decimal | None = None
+    ownership_after: Decimal | None = None
+
+
 class ForecastOutput(ProviderModel):
     instrument_id: UUID
     model_name: str
@@ -217,6 +239,14 @@ class OwnershipProvider(Protocol):
     async def ownership(
         self, instrument: InstrumentProfile
     ) -> ProviderResult[list[OwnershipRecord]]: ...
+
+    async def insider_transactions(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[list[InsiderTransaction]]: ...
+
+    async def ownership_changes(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[list[OwnershipChange]]: ...
 
 
 class ForecastsProvider(Protocol):
