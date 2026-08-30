@@ -45,6 +45,7 @@ class ResearchRunResponse(ApiSchema):
     id: UUID
     status: Literal["pending", "running", "completed", "failed", "cancelled"]
     ticker: str
+    asset_type: Literal["equity", "etf"]
     correlation_id: str
 
 

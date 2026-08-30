@@ -94,7 +94,7 @@ class ResearchRepository:
         with self.database.connect() as connection:
             return connection.execute(
                 """
-                SELECT research_runs.*, instruments.symbol
+                SELECT research_runs.*, instruments.symbol, instruments.asset_type
                 FROM research_runs JOIN instruments ON instruments.id = research_runs.instrument_id
                 WHERE research_runs.id = ?
                 """,

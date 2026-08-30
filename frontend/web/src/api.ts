@@ -1,7 +1,7 @@
 export type RunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 export type LaneStatus = "completed" | "failed";
 
-export interface ResearchRun { id: string; status: RunStatus; ticker: string; correlation_id: string }
+export interface ResearchRun { id: string; status: RunStatus; ticker: string; asset_type?: "equity" | "etf"; correlation_id: string }
 export interface ResearchSnapshot { lane: string; status: LaneStatus; payload: Record<string, unknown> | null; error_message: string | null }
 export interface ResearchRequest { ticker: string; investment_horizon?: string; risk_lens?: string; thesis?: string }
 export interface ApiFailure extends Error { code?: string; correlationId?: string }

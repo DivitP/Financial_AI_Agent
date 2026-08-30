@@ -74,6 +74,7 @@ def test_research_run_endpoints_cover_lifecycle_states_and_snapshots(tmp_path) -
     created = client.post("/api/v1/research-runs", json={"ticker": "AAPL"})
     run_id = created.json()["id"]
     assert created.status_code == 202 and created.json()["status"] == "pending"
+    assert created.json()["asset_type"] == "equity"
     assert client.get(f"/api/v1/research-runs/{run_id}").json()["status"] == "pending"
     assert client.get(f"/api/v1/research-runs/{run_id}/snapshot").json() == []
     assert client.post(f"/api/v1/research-runs/{run_id}/cancel").json()["status"] == "cancelled"

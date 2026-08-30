@@ -136,6 +136,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             id=run.id,
             status=run.status.value,
             ticker=instrument.symbol,
+            asset_type=instrument.asset_type.value,
             correlation_id=request.state.correlation_id,
         )
 
@@ -306,5 +307,6 @@ def _run_response(row, correlation_id: str) -> ResearchRunResponse:
         id=UUID(row["id"]),
         status=row["status"],
         ticker=row["symbol"],
+        asset_type=row["asset_type"],
         correlation_id=correlation_id,
     )
