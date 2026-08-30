@@ -9,12 +9,14 @@ from financial_ai.analysis.positioning import build_positioning_context
 from financial_ai.analysis.etf import analyze_etf, research_sections
 from financial_ai.analysis.quality import assess_data_quality
 from financial_ai.analysis.technical import analyze_technical_regime
+from financial_ai.analysis.decision import DecisionFramework
 from financial_ai.analysis.sentiment import LocalFinanceSentiment
 from financial_ai.analysis.peers import compare_company
 from financial_ai.analysis.valuation import analyze_valuation
 
 __all__ = [
     "EarningsScorecard",
+    "DecisionFramework",
     "GuidanceStatement",
     "LocalFinanceSentiment",
     "analyze_etf",
