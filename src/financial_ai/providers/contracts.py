@@ -176,6 +176,26 @@ class OwnershipChange(ProviderModel):
     ownership_after: Decimal | None = None
 
 
+class OptionsStatistic(ProviderModel):
+    instrument_id: UUID
+    as_of: datetime
+    timeliness: str
+    implied_volatility: Decimal | None = None
+    put_call_open_interest_ratio: Decimal | None = None
+    unusual_options_volume: bool | None = None
+    missing_fields: list[str] = Field(default_factory=list)
+
+
+class ShortInterestObservation(ProviderModel):
+    instrument_id: UUID
+    settlement_at: datetime
+    published_at: datetime
+    timeliness: str
+    short_interest_shares: Decimal | None = None
+    short_interest_percent_float: Decimal | None = None
+    days_to_cover: Decimal | None = None
+
+
 class ForecastOutput(ProviderModel):
     instrument_id: UUID
     model_name: str
@@ -247,6 +267,16 @@ class OwnershipProvider(Protocol):
     async def ownership_changes(
         self, instrument: InstrumentProfile
     ) -> ProviderResult[list[OwnershipChange]]: ...
+
+
+class PositioningProvider(Protocol):
+    async def options_statistics(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[OptionsStatistic]: ...
+
+    async def short_interest(
+        self, instrument: InstrumentProfile
+    ) -> ProviderResult[ShortInterestObservation]: ...
 
 
 class ForecastsProvider(Protocol):

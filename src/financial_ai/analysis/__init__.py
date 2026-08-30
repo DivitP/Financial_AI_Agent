@@ -4,6 +4,8 @@ from financial_ai.analysis.fundamentals import analyze_financial_quality
 from financial_ai.analysis.earnings import EarningsScorecard
 from financial_ai.analysis.guidance import GuidanceStatement
 from financial_ai.analysis.news import cluster_articles
+from financial_ai.analysis.macro import select_macro_series
+from financial_ai.analysis.positioning import build_positioning_context
 from financial_ai.analysis.sentiment import LocalFinanceSentiment
 from financial_ai.analysis.peers import compare_company
 from financial_ai.analysis.valuation import analyze_valuation
@@ -16,4 +18,6 @@ __all__ = [
     "analyze_valuation",
     "compare_company",
     "cluster_articles",
+    "select_macro_series",
+    "build_positioning_context",
 ]
