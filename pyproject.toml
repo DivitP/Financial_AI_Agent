@@ -13,6 +13,7 @@ dependencies = [
     "langchain-community>=0.3.27,<0.4",
     "langchain-core>=0.3.69,<0.4",
     "langchain-groq>=0.2.4,<0.3",
+    "langgraph>=0.2.72,<0.4",
     "lxml[html-clean]>=5.3,<7",
     "markdown>=3.6,<4",
     "matplotlib>=3.9,<4",

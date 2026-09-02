@@ -1,6 +1,12 @@
 """Durable research-run workflows and job orchestration."""
 
+from financial_ai.workflow.graph import PersistentResearchGraph, ResearchGraphState
 from financial_ai.workflow.jobs import LocalResearchJobRunner
 from financial_ai.workflow.research import InitialResearchWorkflow
 
-__all__ = ["InitialResearchWorkflow", "LocalResearchJobRunner"]
+__all__ = [
+    "InitialResearchWorkflow",
+    "LocalResearchJobRunner",
+    "PersistentResearchGraph",
+    "ResearchGraphState",
+]

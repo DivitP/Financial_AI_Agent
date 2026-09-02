@@ -136,6 +136,43 @@ class ResearchRepository:
                 "SELECT * FROM research_snapshots WHERE run_id = ? ORDER BY id", (_id(run_id),)
             ).fetchall()
 
+    def upsert_graph_checkpoint(
+        self,
+        run_id: UUID,
+        node: str,
+        status: str,
+        attempt: int,
+        payload: dict[str, object] | None = None,
+        error_message: str | None = None,
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
+        now = datetime.now().astimezone().isoformat()
+        self._execute(
+            connection,
+            """
+            INSERT INTO graph_checkpoints(run_id, node, status, attempt, payload_json, error_message, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(run_id, node) DO UPDATE SET status=excluded.status, attempt=excluded.attempt,
+                payload_json=excluded.payload_json, error_message=excluded.error_message,
+                updated_at=excluded.updated_at
+            """,
+            (
+                _id(run_id),
+                node,
+                status,
+                attempt,
+                json.dumps(payload, sort_keys=True) if payload is not None else None,
+                error_message,
+                now,
+            ),
+        )
+
+    def graph_checkpoints(self, run_id: UUID) -> list[sqlite3.Row]:
+        with self.database.connect() as connection:
+            return connection.execute(
+                "SELECT * FROM graph_checkpoints WHERE run_id=? ORDER BY node", (_id(run_id),)
+            ).fetchall()
+
     def add_evidence(
         self, evidence: Evidence, connection: sqlite3.Connection | None = None
     ) -> None:

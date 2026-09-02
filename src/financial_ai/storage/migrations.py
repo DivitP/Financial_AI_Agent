@@ -239,9 +239,32 @@ def _downgrade_0004(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE IF EXISTS research_snapshots")
 
 
+def _upgrade_0005(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE graph_checkpoints (
+            run_id TEXT NOT NULL REFERENCES research_runs(id),
+            node TEXT NOT NULL,
+            status TEXT NOT NULL,
+            attempt INTEGER NOT NULL DEFAULT 0,
+            payload_json TEXT,
+            error_message TEXT,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (run_id, node)
+        );
+        CREATE INDEX idx_graph_checkpoints_run_id ON graph_checkpoints(run_id);
+        """
+    )
+
+
+def _downgrade_0005(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE IF EXISTS graph_checkpoints")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
     Migration(3, "evidence_source_quality", _upgrade_0003, _downgrade_0003),
     Migration(4, "initial_research_snapshots", _upgrade_0004, _downgrade_0004),
+    Migration(5, "research_graph_checkpoints", _upgrade_0005, _downgrade_0005),
 )
