@@ -1,0 +1,8 @@
+{
+  "id": "research_brief",
+  "version": "1.0.0",
+  "output_schema": "research_brief",
+  "token_budget": 400,
+  "system": "Summarize only the supplied evidence. Do not give investment advice.",
+  "user_template": "Evidence IDs and excerpts:\n{evidence}"
+}

@@ -1,0 +1,5 @@
+{
+  "summary": "Revenue grew year over year according to the supplied filing.",
+  "evidence_ids": ["evidence-annual-report"],
+  "limitations": ["No point-in-time valuation data was supplied."]
+}

@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, Field, SecretStr, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -68,7 +68,19 @@ class Settings(BaseSettings):
     )
     groq_model: str = Field(default="llama-3.3-70b-versatile", validation_alias="GROQ_MODEL")
     local_llm_model: str = Field(default="qwen3:8b", validation_alias="LOCAL_LLM_MODEL")
+    local_llm_base_url: str = Field(
+        default="http://127.0.0.1:11434",
+        validation_alias="LOCAL_LLM_BASE_URL",
+    )
     kronos_model: str = Field(default="NeoQuasar/Kronos-small", validation_alias="KRONOS_MODEL")
+
+    @field_validator("groq_model", "local_llm_model", "kronos_model")
+    @classmethod
+    def configured_model_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("configured model names must not be blank.")
+        return value
 
     @model_validator(mode="after")
     def validate_enabled_providers(self) -> "Settings":
@@ -76,6 +88,10 @@ class Settings(BaseSettings):
             raise ValueError("ENABLE_GROQ=true requires GROQ_API_KEY.")
         if self.enable_fmp and self.fmp_api_key is None:
             raise ValueError("ENABLE_FMP=true requires FMP_API_KEY.")
+        if self.enable_groq and self.enable_local_llm:
+            raise ValueError("Enable only one chat provider: ENABLE_GROQ or ENABLE_LOCAL_LLM.")
+        if not self.local_llm_base_url.startswith(("http://", "https://")):
+            raise ValueError("LOCAL_LLM_BASE_URL must be an http(s) URL.")
         if self.app_environment == "production" and self.debug:
             raise ValueError("FINANCIAL_AI_DEBUG must be false in production.")
         return self

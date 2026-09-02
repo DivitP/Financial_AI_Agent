@@ -13,6 +13,8 @@ from fastapi import FastAPI, Header, Request
 from fastapi.responses import StreamingResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from settings import get_settings
+
 from financial_ai.api.errors import (
     ApiError,
     api_error_handler,
@@ -29,6 +31,7 @@ from financial_ai.api.schemas import (
     VersionResponse,
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
+from financial_ai.llm import validate_chat_configuration
 from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.workflow.jobs import Job, LocalResearchJobRunner
@@ -49,6 +52,7 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
 def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db")) -> FastAPI:
     """Create an API that is operational without any external-provider credentials."""
 
+    validate_chat_configuration(get_settings())
     database = Database(database_path)
     database.migrate_to_latest()
     repository = ResearchRepository(database)
