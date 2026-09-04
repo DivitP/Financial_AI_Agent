@@ -173,6 +173,78 @@ class ResearchRepository:
                 "SELECT * FROM graph_checkpoints WHERE run_id=? ORDER BY node", (_id(run_id),)
             ).fetchall()
 
+    def upsert_report(
+        self,
+        *,
+        report_id: UUID,
+        run_id: UUID,
+        version: int,
+        as_of: datetime,
+        model_config: dict[str, str],
+        decision_brief: list[str],
+        sections: list[dict[str, object]],
+        evidence_links: dict[UUID, str],
+        connection: sqlite3.Connection | None = None,
+    ) -> None:
+        now = datetime.now().astimezone().isoformat()
+
+        def write(active: sqlite3.Connection) -> None:
+            existing = active.execute(
+                "SELECT id FROM reports WHERE run_id=? AND version=?", (_id(run_id), version)
+            ).fetchone()
+            if existing is not None:
+                active.execute(
+                    "DELETE FROM report_evidence_links WHERE report_id=?", (existing["id"],)
+                )
+                active.execute("DELETE FROM reports WHERE id=?", (existing["id"],))
+            active.execute(
+                """
+                INSERT INTO reports(id, run_id, version, as_of, model_config_json, decision_brief_json,
+                    sections_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _id(report_id),
+                    _id(run_id),
+                    version,
+                    _timestamp(as_of),
+                    json.dumps(model_config, sort_keys=True),
+                    json.dumps(decision_brief),
+                    json.dumps(sections, sort_keys=True),
+                    now,
+                ),
+            )
+            active.executemany(
+                "INSERT INTO report_evidence_links(report_id, evidence_id, exact_url) VALUES (?, ?, ?)",
+                [
+                    (_id(report_id), _id(evidence_id), url)
+                    for evidence_id, url in evidence_links.items()
+                ],
+            )
+
+        if connection is not None:
+            write(connection)
+            return
+        with self.database.transaction() as active:
+            write(active)
+
+    def latest_report(self, run_id: UUID) -> sqlite3.Row | None:
+        with self.database.connect() as connection:
+            return connection.execute(
+                """
+                SELECT * FROM reports WHERE run_id=? ORDER BY version DESC LIMIT 1
+                """,
+                (_id(run_id),),
+            ).fetchone()
+
+    def report_evidence_links(self, report_id: UUID) -> dict[str, str]:
+        with self.database.connect() as connection:
+            rows = connection.execute(
+                "SELECT evidence_id, exact_url FROM report_evidence_links WHERE report_id=?",
+                (_id(report_id),),
+            ).fetchall()
+        return {row["evidence_id"]: row["exact_url"] for row in rows}
+
     def add_evidence(
         self, evidence: Evidence, connection: sqlite3.Connection | None = None
     ) -> None:

@@ -261,10 +261,45 @@ def _downgrade_0005(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE IF EXISTS graph_checkpoints")
 
 
+def _upgrade_0006(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE reports (
+            id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL REFERENCES research_runs(id),
+            version INTEGER NOT NULL,
+            as_of TEXT NOT NULL,
+            model_config_json TEXT NOT NULL,
+            decision_brief_json TEXT NOT NULL,
+            sections_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(run_id, version)
+        );
+        CREATE TABLE report_evidence_links (
+            report_id TEXT NOT NULL REFERENCES reports(id),
+            evidence_id TEXT NOT NULL REFERENCES evidence(id),
+            exact_url TEXT NOT NULL,
+            PRIMARY KEY(report_id, evidence_id)
+        );
+        CREATE INDEX idx_reports_run_version ON reports(run_id, version DESC);
+        """
+    )
+
+
+def _downgrade_0006(connection: sqlite3.Connection) -> None:
+    connection.executescript(
+        """
+        DROP TABLE IF EXISTS report_evidence_links;
+        DROP TABLE IF EXISTS reports;
+        """
+    )
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
     Migration(3, "evidence_source_quality", _upgrade_0003, _downgrade_0003),
     Migration(4, "initial_research_snapshots", _upgrade_0004, _downgrade_0004),
     Migration(5, "research_graph_checkpoints", _upgrade_0005, _downgrade_0005),
+    Migration(6, "evidence_backed_reports", _upgrade_0006, _downgrade_0006),
 )

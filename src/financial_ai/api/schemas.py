@@ -56,6 +56,17 @@ class ResearchSnapshotResponse(ApiSchema):
     error_message: str | None = None
 
 
+class ReportResponse(ApiSchema):
+    id: UUID
+    run_id: UUID
+    version: int
+    as_of: datetime
+    model_configuration: dict[str, str]
+    decision_brief: list[str]
+    sections: list[dict[str, object]]
+    evidence_links: dict[str, str]
+
+
 class HealthResponse(ApiSchema):
     status: Literal["ok"]
 

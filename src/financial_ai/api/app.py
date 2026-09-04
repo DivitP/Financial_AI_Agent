@@ -28,6 +28,7 @@ from financial_ai.api.schemas import (
     JobResponse,
     ResearchRunResponse,
     ResearchSnapshotResponse,
+    ReportResponse,
     VersionResponse,
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
@@ -167,6 +168,27 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             )
             for row in repository.snapshots(run_id)
         ]
+
+    @app.get(
+        "/api/v1/research-runs/{run_id}/reports/latest",
+        response_model=ReportResponse,
+        tags=["research"],
+    )
+    def get_latest_report(run_id: UUID) -> ReportResponse:
+        _run_or_error(repository, run_id)
+        row = repository.latest_report(run_id)
+        if row is None:
+            raise ApiError("report_not_found", "No verified report is available for this run.", 404)
+        return ReportResponse(
+            id=UUID(row["id"]),
+            run_id=UUID(row["run_id"]),
+            version=int(row["version"]),
+            as_of=datetime.fromisoformat(row["as_of"]),
+            model_configuration=json.loads(row["model_config_json"]),
+            decision_brief=json.loads(row["decision_brief_json"]),
+            sections=json.loads(row["sections_json"]),
+            evidence_links=repository.report_evidence_links(UUID(row["id"])),
+        )
 
     @app.get("/api/v1/research-runs/{run_id}/events", tags=["research"])
     async def stream_research_run(

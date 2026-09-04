@@ -3,6 +3,7 @@ export type LaneStatus = "completed" | "failed";
 
 export interface ResearchRun { id: string; status: RunStatus; ticker: string; asset_type?: "equity" | "etf"; correlation_id: string }
 export interface ResearchSnapshot { lane: string; status: LaneStatus; payload: Record<string, unknown> | null; error_message: string | null }
+export interface ResearchReport { id: string; run_id: string; version: number; as_of: string; model_configuration: Record<string, string>; decision_brief: string[]; sections: { title: string; findings: { summary: string; evidence_ids: string[] }[] }[]; evidence_links: Record<string, string> }
 export interface ResearchRequest { ticker: string; investment_horizon?: string; risk_lens?: string; thesis?: string }
 export interface ApiFailure extends Error { code?: string; correlationId?: string }
 
@@ -25,6 +26,11 @@ export const researchApi = {
     const result = await request<unknown>(`/api/v1/research-runs/${id}/snapshot`);
     if (!Array.isArray(result)) throw new Error("The research service returned an invalid snapshot response.");
     return result as ResearchSnapshot[];
+  },
+  report: async (id: string) => {
+    const result = await request<unknown>(`/api/v1/research-runs/${id}/reports/latest`);
+    if (!result || typeof result !== "object" || !Array.isArray((result as ResearchReport).decision_brief) || !Array.isArray((result as ResearchReport).sections)) throw new Error("The research service returned an invalid report response.");
+    return result as ResearchReport;
   },
   cancel: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}/cancel`, { method: "POST" }),
   retry: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}/retry`, { method: "POST" }),
