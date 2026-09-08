@@ -295,6 +295,18 @@ def _downgrade_0006(connection: sqlite3.Connection) -> None:
     )
 
 
+def _upgrade_0007(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE qa_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        run_id TEXT NOT NULL REFERENCES research_runs(id),
+        question TEXT NOT NULL, answer_json TEXT NOT NULL,
+        created_at TEXT NOT NULL)""")
+
+
+def _downgrade_0007(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE IF EXISTS qa_history")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -302,4 +314,5 @@ MIGRATIONS = (
     Migration(4, "initial_research_snapshots", _upgrade_0004, _downgrade_0004),
     Migration(5, "research_graph_checkpoints", _upgrade_0005, _downgrade_0005),
     Migration(6, "evidence_backed_reports", _upgrade_0006, _downgrade_0006),
+    Migration(7, "research_qa_history", _upgrade_0007, _downgrade_0007),
 )

@@ -33,6 +33,9 @@ from financial_ai.api.schemas import (
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
 from financial_ai.llm import validate_chat_configuration
+from financial_ai.llm.providers import create_chat_provider
+from financial_ai.retrieval.index import ResearchIndex
+from financial_ai.retrieval.qa import ResearchQA, Question, AnswerRejected
 from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.workflow.jobs import Job, LocalResearchJobRunner
@@ -70,12 +73,65 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     app.state.database = database
     app.state.repository = repository
     app.state.runner = runner
+    app.state.qa = ResearchQA(
+        ResearchIndex(database, Path(database_path).with_suffix(".index.db")),
+        create_chat_provider(get_settings()),
+    )
     app.add_middleware(CorrelationIdMiddleware)
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
     from fastapi.exceptions import RequestValidationError
 
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+
+    @app.get("/api/v1/research-runs/{run_id}/qa", tags=["research"])
+    def qa_history(run_id: UUID):
+        _run_or_error(repository, run_id)
+        with database.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM qa_history WHERE run_id=? ORDER BY id DESC LIMIT 100", (str(run_id),)
+            ).fetchall()
+        return [
+            {"id": r["id"], "question": r["question"], "answer": json.loads(r["answer_json"])}
+            for r in reversed(rows)
+        ]
+
+    @app.post("/api/v1/research-runs/{run_id}/qa", tags=["research"])
+    async def ask_question(run_id: UUID, payload: Question):
+        run = _run_or_error(repository, run_id)
+        try:
+            answer = await app.state.qa.answer(run_id, run["symbol"], payload.question)
+        except AnswerRejected:
+            raise ApiError(
+                "invalid_answer_citations",
+                "The answer could not be verified. Please try again.",
+                422,
+            ) from None
+        except Exception:
+            raise ApiError(
+                "qa_unavailable", "Research Q&A is temporarily unavailable.", 503
+            ) from None
+        with database.transaction() as connection:
+            cursor = connection.execute(
+                "INSERT INTO qa_history(run_id, question, answer_json, created_at) VALUES (?, ?, ?, ?)",
+                (str(run_id), payload.question, json.dumps(answer), answer["as_of"]),
+            )
+            turn_id = cursor.lastrowid
+
+        async def stream():
+            # No model tokens leave the server before the whole answer is validated.
+            for claim in answer["claims"]:
+                yield "event: claim\ndata: " + json.dumps(claim) + "\n\n"
+                await asyncio.sleep(0)
+            yield (
+                "event: complete\ndata: "
+                + json.dumps({"id": turn_id, "question": payload.question, "answer": answer})
+                + "\n\n"
+            )
+
+        return StreamingResponse(
+            stream(), media_type="text/event-stream", headers={"Cache-Control": "no-store"}
+        )
 
     @app.get("/health", response_model=HealthResponse, tags=["system"])
     def health() -> HealthResponse:

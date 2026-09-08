@@ -38,6 +38,7 @@ build-backend = "hatchling.build"
 packages = ["src/financial_ai"]
 
 [project.optional-dependencies]
+vector = ["chromadb>=1.0,<2", "sentence-transformers>=3.4,<6"]
 openbb = [
     "openbb-core>=1.6,<2",
     "openbb-equity>=1.6,<2",

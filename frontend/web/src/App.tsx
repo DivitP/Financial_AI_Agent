@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { ApiFailure, researchApi, ResearchReport, ResearchRequest, ResearchSnapshot, subscribeToRun } from "./api";
+import { ResearchChat } from "./ResearchChat";
 
 const tickerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$/;
 
@@ -35,6 +36,7 @@ function ResearchDashboard() {
   if (run.isLoading) return <Shell><Loading /></Shell>; if (run.error || !run.data) return <Shell><ErrorNotice error={run.error as ApiFailure} /></Shell>;
   return <Shell><main><Link to="/" className="back-link">← New research</Link><header className="run-header"><div><p className="eyebrow">Research run</p><h1>{run.data.ticker}</h1><p className="muted">{streamState}</p></div><Status status={run.data.status} /></header>
     <Progress snapshots={snapshots.data ?? []} status={run.data.status} />
+    <ResearchChat key={runId} runId={runId} />
     <div className="actions">{active(run.data.status) && <button className="secondary" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel run</button>}{["failed", "cancelled"].includes(run.data.status) && <button onClick={() => retry.mutate()} disabled={retry.isPending}>Retry research</button>}</div>
     {run.data.status === "completed" && <Overview snapshots={snapshots.data ?? []} ticker={run.data.ticker} assetType={run.data.asset_type ?? "equity"} report={report.data} />}{snapshots.error && <ErrorNotice error={snapshots.error as ApiFailure} />}
   </main></Shell>;
