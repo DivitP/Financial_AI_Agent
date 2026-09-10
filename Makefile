@@ -21,6 +21,10 @@ typecheck:
 test:
 	$(PYTHON) -m pytest
 
+.PHONY: rag-eval
+rag-eval:
+	$(PYTHON) -m pytest tests/test_rag_evaluation.py --no-cov -s
+
 frontend-install:
 	npm --prefix frontend/web install
 

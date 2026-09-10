@@ -34,6 +34,8 @@ jobs:
         run: uv run mypy
       - name: Run offline characterization tests
         run: uv run pytest
+      - name: Gate offline RAG evaluation thresholds
+        run: make rag-eval
       - name: Install locked frontend dependencies
         working-directory: frontend/web
         run: npm ci
