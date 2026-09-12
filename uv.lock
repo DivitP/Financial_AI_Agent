@@ -822,6 +822,15 @@ wheels = [
 ]
 
 [[package]]
+name = "einops"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/81/df4fbe24dff8ba3934af99044188e20a98ed441ad17a274539b74e82e126/einops-0.8.1.tar.gz", hash = "sha256:de5d960a7a761225532e0f1959e5315ebeafc0cd43394732f103ca44b9837e84", size = 54805, upload-time = "2025-02-09T03:17:00.434Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/62/9773de14fe6c45c23649e98b83231fffd7b9892b6cf863251dc2afa73643/einops-0.8.1-py3-none-any.whl", hash = "sha256:919387eb55330f5757c6bea9165c5ff5cfe63a642682ea788a6d472576d81737", size = 64359, upload-time = "2025-02-09T03:17:01.998Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.136.3"
 source = { registry = "https://pypi.org/simple" }
@@ -901,9 +910,11 @@ dependencies = [
 [package.optional-dependencies]
 kronos = [
     { name = "accelerate" },
+    { name = "einops" },
     { name = "huggingface-hub" },
     { name = "safetensors" },
     { name = "torch" },
+    { name = "tqdm" },
     { name = "transformers" },
 ]
 local-llm = [
@@ -940,6 +951,7 @@ requires-dist = [
     { name = "arch", specifier = ">=7.2,<9" },
     { name = "chromadb", marker = "extra == 'vector'", specifier = ">=1.0,<2" },
     { name = "duckduckgo-search", specifier = ">=6.3,<8" },
+    { name = "einops", marker = "extra == 'kronos'", specifier = "==0.8.1" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "flask", specifier = ">=3.0,<4" },
     { name = "huggingface-hub", marker = "extra == 'kronos'", specifier = ">=0.27,<1" },
@@ -969,6 +981,7 @@ requires-dist = [
     { name = "statsmodels", specifier = ">=0.14.4,<1" },
     { name = "torch", marker = "extra == 'kronos'", specifier = ">=2.5,<3" },
     { name = "torch", marker = "extra == 'sentiment'", specifier = ">=2.5,<3" },
+    { name = "tqdm", marker = "extra == 'kronos'", specifier = ">=4.67.1,<5" },
     { name = "transformers", marker = "extra == 'kronos'", specifier = ">=4.47,<6" },
     { name = "transformers", marker = "extra == 'sentiment'", specifier = ">=4.47,<6" },
     { name = "uvicorn", specifier = ">=0.30,<1" },

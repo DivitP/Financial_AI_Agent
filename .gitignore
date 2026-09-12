@@ -32,6 +32,10 @@ artifacts/
 .models/
 models/
 huggingface/
+*.safetensors
+*.pt
+*.pth
+*.ckpt
 *.db
 *.sqlite
 *.sqlite3

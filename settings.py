@@ -73,6 +73,16 @@ class Settings(BaseSettings):
         validation_alias="LOCAL_LLM_BASE_URL",
     )
     kronos_model: str = Field(default="NeoQuasar/Kronos-small", validation_alias="KRONOS_MODEL")
+    kronos_cache_dir: Path = Field(
+        default=Path("data/runtime/kronos"), validation_alias="KRONOS_CACHE_DIR"
+    )
+    kronos_source_dir: Path = Field(
+        default=Path("data/runtime/kronos/source"), validation_alias="KRONOS_SOURCE_DIR"
+    )
+    kronos_device: Literal["cpu", "cuda", "mps"] = Field(
+        default="cpu", validation_alias="KRONOS_DEVICE"
+    )
+    kronos_allow_downloads: bool = Field(default=False, validation_alias="KRONOS_ALLOW_DOWNLOADS")
 
     @field_validator("groq_model", "local_llm_model", "kronos_model")
     @classmethod
@@ -84,6 +94,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_enabled_providers(self) -> "Settings":
+        if self.enable_kronos and self.kronos_model != "NeoQuasar/Kronos-small":
+            raise ValueError(
+                "KRONOS_MODEL is not in the reviewed model manifest; use NeoQuasar/Kronos-small."
+            )
         if self.enable_groq and self.groq_api_key is None:
             raise ValueError("ENABLE_GROQ=true requires GROQ_API_KEY.")
         if self.enable_fmp and self.fmp_api_key is None:

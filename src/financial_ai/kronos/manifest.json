@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-09-11",
+  "source": {
+    "repository": "https://github.com/shiyu-coder/Kronos",
+    "revision": "67b630e67f6a18c9e9be918d9b4337c960db1e9a",
+    "license": "MIT",
+    "license_url": "https://github.com/shiyu-coder/Kronos/blob/67b630e67f6a18c9e9be918d9b4337c960db1e9a/LICENSE"
+  },
+  "max_context": 512,
+  "artifacts": [
+    {
+      "role": "model",
+      "repository": "NeoQuasar/Kronos-small",
+      "revision": "901c26c1332695a2a8f243eb2f37243a37bea320",
+      "license": "MIT",
+      "license_url": "https://huggingface.co/NeoQuasar/Kronos-small/blob/901c26c1332695a2a8f243eb2f37243a37bea320/README.md",
+      "filename": "model.safetensors",
+      "sha256": "b082dfcbd8e8c142a725c8bbb99781802f38fec81210e13479effb32b3c3e020",
+      "size_bytes": 98980656,
+      "config_git_blob": "66df12427eadc6ad1980fae63ad5aef4f93bc9d6"
+    },
+    {
+      "role": "tokenizer",
+      "repository": "NeoQuasar/Kronos-Tokenizer-base",
+      "revision": "0e0117387f39004a9016484a186a908917e22426",
+      "license": "MIT",
+      "license_url": "https://huggingface.co/NeoQuasar/Kronos-Tokenizer-base/blob/0e0117387f39004a9016484a186a908917e22426/README.md",
+      "filename": "model.safetensors",
+      "sha256": "59d85f6af76a2c3b8240ea06cb21db4213b4eeca053f246b23e29cf832fc6bee",
+      "size_bytes": 15842368,
+      "config_git_blob": "050b676e14720956dc6ff93a755e65dee5536807"
+    }
+  ]
+}
