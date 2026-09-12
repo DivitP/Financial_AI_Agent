@@ -70,8 +70,54 @@ hash without loading a model. Missing or altered files fail verification.
 `ENABLE_KRONOS=false`, CPU device and downloads disabled are the defaults. The
 download flag is reserved for an explicit future acquisition command: setting it
 does not download anything. Startup and tests never fetch weights. Source checkout
-and inference loading remain separate from base API startup; this change does not
-implement predictions. Only the small/base-tokenizer pairing is reviewed.
+and inference loading remain separate from base API startup. Only the
+small/base-tokenizer pairing is reviewed.
+
+## Local inference
+
+After preparing the pinned local assets above, use the provider with the output
+of `prepare_candles`:
+
+```python
+from settings import Settings
+from financial_ai.kronos.inference import InferenceConfig, LocalKronosProvider
+
+settings = Settings()  # ENABLE_KRONOS=true is required to forecast
+provider = LocalKronosProvider.from_settings(settings, config=InferenceConfig(
+    device=settings.kronos_device, seed=0, timeout_seconds=120,
+    sample_count=1, temperature=1.0, top_p=0.9, cache_ttl_seconds=3600,
+))
+forecast = provider.forecast(prepared)
+```
+
+Construction never imports PyTorch or loads weights. Each cache miss launches a
+fresh offline worker, verifies the clean pinned source checkout and artifact
+hashes, and loads the tokenizer/model from local directories. Explicit `cpu`,
+`mps`, and `cuda` selection is supported; unavailable devices fail rather than
+silently changing device. Seeds and strict deterministic algorithms are set;
+reproducibility is limited to the same device/software environment, not promised
+across hardware. Unsupported deterministic operations fail closed.
+
+The timeout includes loading and inference. The child exits after each request;
+timeouts kill and reap it, releasing its model memory. This favors bounded memory
+over warm-model latency. It is not a process-pool or distributed GPU scheduler.
+SQLite TTL caching under `KRONOS_CACHE_DIR/forecasts.sqlite3` keys on prepared
+inputs, pinned manifest, adapter version, and configuration. Failed or malformed
+forecasts are never cached. Delete this disposable cache after changing the
+runtime dependency environment. Concurrent cache misses may each run inference.
+
+Results identify model/tokenizer/source revisions, device, configuration,
+timestamps, currency, units, adjustment policy and warnings. Predicted OHLCV must
+be finite and internally consistent; invalid outputs are rejected, not repaired.
+Missing turnover is explicitly encoded as a zero input placeholder, preventing
+upstream's automatic synthetic turnover estimate; this may affect model quality
+and is disclosed in warnings. It is never returned as observed turnover.
+No confidence or trading recommendation is produced. This callable provider is
+not yet scheduled by the research workflow or exposed as a forecast UI.
+
+Offline tests exercise the worker with a fixture model/tokenizer on CPU, device
+failures, cache hits/expiry, and real subprocess timeout/error handling. They do
+not validate downloaded weights, real-model accuracy, or GPU performance.
 
 References: [official source and installation](https://github.com/shiyu-coder/Kronos),
 [model card](https://huggingface.co/NeoQuasar/Kronos-small),
