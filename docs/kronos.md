@@ -1,5 +1,44 @@
 # Optional Kronos environment
 
+## Daily candle preparation
+
+`financial_ai.kronos.preprocessing.prepare_candles` takes typed daily `Candle`
+records, `Session` calendar entries, and `CorporateAction` records. It returns
+adjusted candles, exchange-local historical/future close timestamps, provenance,
+adjustment policy, missing dates, applied action IDs and truncation metadata.
+It imports no PyTorch and does not run predictions.
+
+Supply the complete exchange schedule from the earliest input candle through the
+requested horizon. A generic weekday calendar is insufficient: holidays must be
+absent and early closes must carry their actual close time. The caller is responsible
+for calendar completeness and confirmed action coverage. This function cannot detect
+an omitted holiday or unreported split in an incorrectly labelled provider response.
+The current OpenBB single-date calendar metadata is not a complete schedule; collect
+one before using this preprocessing boundary. Naive daily provider dates must be
+mapped to exchange-local session labels by the caller, not interpreted as UTC closes.
+
+For raw candles, a split ratio means new shares divided by old shares. Earlier OHLC
+is divided by this ratio and volume multiplied by it. Split-adjusted input is not
+split-adjusted again; its volume must already use the corresponding share basis.
+Dividends require explicit provider historical-price factors unless input is already
+total-return adjusted. Other action types fail closed. Adjusted inputs must be
+anchored at this as-of cutoff, with no adjustments from later events. Known actions
+inside the forecast horizon block preparation pending an inverse-adjustment layer.
+
+Missing completed sessions fail by default, including a missing latest candle.
+`missing_policy="contiguous_suffix"` retains only the uninterrupted suffix after
+the final gap, requires at least two observations and records a warning. There is
+no fill-forward or zero-volume holiday insertion. The final context is capped by
+the manifest's 512-session limit. Future dates come only from the supplied schedule.
+
+Optional `amount` means observed traded currency turnover. It is retained only
+with full coverage and no newly applied adjustment; otherwise the entire amount
+column is omitted. No close-times-volume approximation is generated. Prices and
+volumes must be finite, positive/nonnegative and internally consistent.
+
+Offline fixtures cover split/dividend continuity, holiday exclusion, incomplete
+sessions, context truncation, future actions, and amount handling.
+
 Base install: `uv sync --locked --all-groups` (no Kronos extra).
 Opt-in runtime: `uv sync --locked --extra kronos`.
 The extra includes PyTorch, einops, tqdm, Hugging Face Hub and safetensors;
