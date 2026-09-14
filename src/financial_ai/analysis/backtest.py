@@ -216,6 +216,7 @@ def walk_forward(
                 "final_equity": str(final),
                 "net_return": str(final / equity - 1),
                 "fees": str(entry_fee + exit_fee),
+                "traded_notional": str(budget / (1 + fee) + proceeds),
                 "slippage_cost": str(slippage),
                 "dividend_accrual": str(dividends),
                 "dividends_paid": str(payments),

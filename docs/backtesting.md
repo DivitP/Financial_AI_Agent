@@ -99,3 +99,88 @@ rolling/expanding windows, holidays, costs, revisions, next-open execution, spli
 continuity, ex-date entitlement and unpaid dividends. Synthetic premature bars,
 unavailable vintages/calendars, future citations and model training leakage fail
 explicitly; perturbing future prices leaves the first decision unchanged.
+
+## Matched forecast baselines and metrics
+
+`financial_ai.analysis.forecast_evaluation.compare_forecasts` runs six baselines
+and a caller-supplied Kronos forecast callback on identical walk-forward training
+windows, test sessions, horizons, currency, cost settings and raw-price vintages.
+It returns every forecast, outcome/evidence IDs, per-window metrics, aggregate
+metrics and the corresponding trading simulation. No live requests are required.
+
+```python
+from financial_ai.analysis.forecast_evaluation import compare_forecasts, kronos_prediction
+
+def predict_kronos(view):
+    # Caller must obtain PIT OHLCV for exactly view.prices and use only its
+    # as_of and forecast_sessions. Never fabricate high/low/volume from closes.
+    prepared = prepare_matching_ohlcv(view)
+    return kronos_prediction(local_provider.forecast(prepared))
+
+comparison = compare_forecasts(
+    dataset, config, kronos=predict_kronos,
+    kronos_version="audited-model-and-adapter-version",
+    kronos_training_cutoff=audited_training_cutoff,
+    seed=0, samples=512,
+)
+```
+
+`prepare_matching_ohlcv` and `audited_training_cutoff` are caller-supplied inputs,
+not bundled functions or invented training metadata. This engine's open/close
+dataset lacks the OHLCV needed for Kronos; it therefore accepts a trusted callback
+and provides `kronos_prediction` to adapt the local provider's median/5th/95th
+percentiles. Use at least two Kronos paths and do not silently truncate a training
+window to its model context limit. Record its full version, sampling configuration
+and input provenance outside the callback as part of the evaluation artifact.
+Tests use a clearly identified fixture callback, not actual Kronos weights.
+
+Baseline definitions (fit afresh only on each training window):
+
+- Last-value: constant final observed close, no artificial interval.
+- Drift: final close plus horizon times first-to-last slope.
+- Linear: ordinary least-squares price against session index, extrapolated.
+- Random-walk: zero-mean Gaussian price increments, sample standard deviation of
+  training price differences; point forecast equals last close. Seeded simulation
+  provides marginal 5th/95th percentiles.
+- Volatility: zero-log-drift simulation, with EWMA squared log-return variance
+  (decay 0.94, initialized to first squared return). Point forecast is the median,
+  last close; intervals come from seeded paths. It is not a fitted GARCH model.
+- ARIMA: fixed (1,1,0) with drift (`trend="t"`), using existing statsmodels and
+  nominal 90% forecast intervals. Minimum eight observations; failed convergence
+  fails the comparison, never substitutes a different baseline.
+
+The random seed is reset for each stochastic baseline/window, giving reproducible
+common random numbers. Point forecasts must be positive/finite; Gaussian intervals
+may include negative values and are not clipped or claimed to respect a price
+floor. Missing/malformed predictions or wrong dates fail the entire comparison.
+Currently any corporate action in the supplied dataset also fails the comparison:
+raw and adjusted forecasts must not be scored against incompatible targets. Supply
+an action-free evaluation dataset until a shared point-in-time adjustment adapter
+is implemented. Never selectively omit windows based on a model's performance.
+
+MAE and RMSE use every horizon step in currency units. MASE divides each fold's
+MAE by its training-only mean absolute one-session naive difference. Zero scales
+produce null with a reason, not zero or infinity. Terminal direction accuracy
+compares the sign of terminal change from the last observed close, with flat as
+a distinct outcome. Interval coverage counts inclusive hits in nominal 90% bands;
+models without intervals have null coverage. Coverage is observed performance,
+not an assurance of calibrated confidence.
+
+`mean_window_metrics` equally weights complete, equal-length windows; aggregated
+RMSE takes the square root of the mean squared window RMSE (pooled error), not
+the mean of RMSEs. If any window has undefined MASE/coverage, its aggregate is
+null instead of silently excluding that window. No ranking mixes currencies or
+different horizons.
+
+For trading diagnostics only, all models use the same fixed rule: fully long if
+the terminal point exceeds the last close, otherwise cash, with the existing
+next-open entry/final-close liquidation and identical fees/slippage. Turnover is
+the sum of both executed leg notionals divided by each fold's starting equity;
+it is an equity multiple, not annualized or halved. `max_fold_end_drawdown`
+measures peak-to-trough decline from initial capital at fold exits only. It does
+not claim intraperiod/daily maximum drawdown. Forecast errors and trading outcomes
+are kept separate; neither alone establishes forecast confidence.
+
+Run `uv run pytest tests/test_forecast_evaluation.py` for deterministic offline
+formula, seeded simulation, real ARIMA, matching-window and failure tests.
+ARIMA reference: [statsmodels official API](https://www.statsmodels.org/stable/generated/statsmodels.tsa.arima.model.ARIMA.html).
