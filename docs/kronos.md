@@ -121,6 +121,10 @@ not validate downloaded weights, real-model accuracy, or GPU performance.
 
 ## Probabilistic paths
 
+For point-in-time strategy evaluation, see [the walk-forward engine](backtesting.md).
+It requires trustworthy data and model-training cutoffs; Kronos integration and
+forecast calibration are separate from the engine itself.
+
 `sample_count` requests 1–16 complete OHLCV paths (default 1 for compatibility).
 The worker draws sequentially with upstream `sample_count=1`, avoiding its
 internal averaging. Models load once per request; all draws share the original
