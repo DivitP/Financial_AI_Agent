@@ -15,7 +15,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from financial_ai.kronos import load_manifest
-from financial_ai.kronos.preprocessing import Candle, PreparedCandles
+from financial_ai.kronos.preprocessing import PreparedCandles
+from financial_ai.kronos.distribution import summarize_paths
 
 
 class InferenceConfig(BaseModel):
@@ -75,7 +76,7 @@ class LocalKronosProvider:
             "prepared": prepared.model_dump(mode="json"),
             "config": self.config.model_dump(),
             "manifest": manifest.model_dump(mode="json"),
-            "adapter_version": "local-v1",
+            "adapter_version": "local-v2-paths",
         }
         key = hashlib.sha256(json.dumps(request, sort_keys=True).encode()).hexdigest()
         self.cache.parent.mkdir(parents=True, exist_ok=True)
@@ -90,9 +91,12 @@ class LocalKronosProvider:
         request.update(assets=str(self.assets.resolve()), source=str(self.source.resolve()))
         try:
             result = self._execute(request)
-            predictions = [Candle.model_validate(row) for row in result["candles"]]
-            if [b.session for b in predictions] != [t.date() for t in prepared.future_timestamps]:
-                raise ValueError("Forecast output sessions do not match requested horizon")
+            summary = summarize_paths(
+                result["paths"],
+                sessions=[t.date() for t in prepared.future_timestamps],
+                count=self.config.sample_count,
+                last_close=prepared.candles[-1].close,
+            )
             if result["device"] != self.config.device:
                 raise ValueError("Forecast device mismatch")
         except subprocess.TimeoutExpired:
@@ -102,7 +106,8 @@ class LocalKronosProvider:
         output = {
             "model_id": manifest.artifacts[0].repository,
             "tokenizer_id": manifest.artifacts[1].repository,
-            "candles": [b.model_dump(mode="json") for b in predictions],
+            **summary,
+            "path_seeds": [(self.config.seed + i) % 2**32 for i in range(self.config.sample_count)],
             "timestamps": [t.isoformat() for t in prepared.future_timestamps],
             "model_version": manifest.artifacts[0].revision,
             "tokenizer_version": manifest.artifacts[1].revision,
@@ -119,6 +124,14 @@ class LocalKronosProvider:
             "units": {"prices": prepared.currency, "volume": "shares"},
             "warnings": prepared.warnings
             + ["Unvalidated model output; not forecast confidence or investment advice."]
+            + [
+                "Percentile bands and direction frequencies describe model samples, not calibrated probabilities."
+            ]
+            + (
+                ["One path cannot characterize forecast uncertainty."]
+                if self.config.sample_count == 1
+                else []
+            )
             + (
                 []
                 if all(b.amount is not None for b in prepared.candles)

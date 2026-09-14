@@ -85,7 +85,7 @@ from financial_ai.kronos.inference import InferenceConfig, LocalKronosProvider
 settings = Settings()  # ENABLE_KRONOS=true is required to forecast
 provider = LocalKronosProvider.from_settings(settings, config=InferenceConfig(
     device=settings.kronos_device, seed=0, timeout_seconds=120,
-    sample_count=1, temperature=1.0, top_p=0.9, cache_ttl_seconds=3600,
+    sample_count=8, temperature=1.0, top_p=0.9, cache_ttl_seconds=3600,
 ))
 forecast = provider.forecast(prepared)
 ```
@@ -118,6 +118,37 @@ not yet scheduled by the research workflow or exposed as a forecast UI.
 Offline tests exercise the worker with a fixture model/tokenizer on CPU, device
 failures, cache hits/expiry, and real subprocess timeout/error handling. They do
 not validate downloaded weights, real-model accuracy, or GPU performance.
+
+## Probabilistic paths
+
+`sample_count` requests 1–16 complete OHLCV paths (default 1 for compatibility).
+The worker draws sequentially with upstream `sample_count=1`, avoiding its
+internal averaging. Models load once per request; all draws share the original
+context and horizon. Path seeds are `(seed + path_index) % 2**32` and are returned
+alongside raw `paths`. The timeout bounds the entire request, not each draw.
+Any invalid path fails the whole forecast; none are silently removed, repaired,
+or resampled. Cache version `local-v2-paths` excludes old averaged forecasts.
+
+`candles` now contains component-wise median OHLCV, a summary rather than an
+actually sampled trajectory. `summary.bands` contains pointwise closing-price
+5th/25th/50th/75th/95th percentiles, using linear interpolation at `(n-1)*q`.
+These are marginal bands, not simultaneous trajectory coverage or calibrated
+confidence intervals. Small sample counts produce particularly unstable tails.
+
+Direction probabilities are terminal close frequencies above/equal/below the
+last adjusted observed close. `terminal_return` stores each path's terminal
+simple return (`final / reference - 1`), its mean (model-implied expected return),
+and percentiles. `session_volatility` stores each path's sample standard deviation
+of simple session returns, including the first forecast return from the observed
+close, plus cross-path mean and percentiles. It is not annualized and is null for
+a one-session horizon. Returns/volatility are decimal-string fractions: `0.39`
+means 39%, not 0.39%. Direction frequencies are numeric fractions.
+
+Fixed seeds reproduce raw paths and summaries with the same inputs, pinned model,
+configuration, device and software environment. Generation timestamps are not
+expected to repeat. Offline stochastic fixture tests verify fresh uncached repeat
+runs, changed seeds, seed wraparound, quantiles, ties, missing volatility, and
+invalid paths. No out-of-sample calibration or real-weight accuracy is claimed.
 
 References: [official source and installation](https://github.com/shiyu-coder/Kronos),
 [model card](https://huggingface.co/NeoQuasar/Kronos-small),

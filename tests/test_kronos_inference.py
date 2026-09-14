@@ -1,5 +1,6 @@
 import contextlib
 import json
+import random
 import sqlite3
 import subprocess
 import sys
@@ -63,9 +64,13 @@ def test_worker_cpu_fixture_loads_verified_assets_and_local_timestamps(
             assert kw == {"device": "cpu", "max_context": 512}
 
         def predict(self, **kw):
+            assert kw["sample_count"] == 1
             assert kw["x_timestamp"].dt.hour.tolist() == [16] * 4
             assert kw["df"]["amount"].tolist() == [0] * 4
-            return pd.DataFrame([dict(open=50, high=50, low=50, close=50, volume=100)] * 2)
+            price = 50 + random.random()
+            return pd.DataFrame(
+                [dict(open=price, high=price, low=price, close=price, volume=100)] * 2
+            )
 
     module = SimpleNamespace(Kronos=Model, KronosTokenizer=Model, KronosPredictor=Predictor)
     monkeypatch.setattr(worker.importlib.util, "module_from_spec", lambda spec: module)
@@ -81,13 +86,22 @@ def test_worker_cpu_fixture_loads_verified_assets_and_local_timestamps(
     result = p.forecast(candles)
     assert result["device"] == "cpu"
     assert result["model_version"] == load_manifest().artifacts[0].revision
-    assert result["candles"][0]["close"] == "50.0"
+    assert float(result["candles"][0]["close"]) > 50
     assert calls[:2] == ["model", "tokenizer"]
     count = len(calls)
     assert p.forecast(candles)["cache_hit"]
     assert len(calls) == count
     p.config = InferenceConfig(seed=12)
     assert not p.forecast(candles)["cache_hit"]
+    p.config = InferenceConfig(seed=2**32 - 1, sample_count=4, cache_ttl_seconds=0)
+    first, second = p.forecast(candles), p.forecast(candles)
+    assert not second["cache_hit"]
+    assert first["paths"] == second["paths"]
+    assert first["summary"] == second["summary"]
+    assert first["path_seeds"] == [2**32 - 1, 0, 1, 2]
+    assert len({path[0]["close"] for path in first["paths"]}) == 4
+    p.config = InferenceConfig(seed=3, sample_count=4, cache_ttl_seconds=0)
+    assert p.forecast(candles)["paths"] != first["paths"]
     for device in ["cuda", "mps"]:
         p.config = InferenceConfig(device=device)
         with pytest.raises(ValueError, match="unavailable"):
@@ -113,7 +127,7 @@ def test_subprocess_timeout_failure_and_invalid_output_are_not_cached(
     monkeypatch.setattr(
         p,
         "_worker_command",
-        lambda: [sys.executable, "-c", 'print(\'{"candles": [], "device": "cpu"}\')'],
+        lambda: [sys.executable, "-c", 'print(\'{"paths": [[]], "device": "cpu"}\')'],
     )
     with pytest.raises(ValueError, match="sessions"):
         p.forecast(candles)
@@ -138,9 +152,11 @@ def test_disabled_lazy_import_and_cache_expiry(tmp_path, monkeypatch, candles):
     assert not p.cache.exists()
     p.enabled = True
     result = {
-        "candles": [
-            dict(session=t.date().isoformat(), open=50, high=50, low=50, close=50, volume=10)
-            for t in candles.future_timestamps
+        "paths": [
+            [
+                dict(session=t.date().isoformat(), open=50, high=50, low=50, close=50, volume=10)
+                for t in candles.future_timestamps
+            ]
         ],
         "device": "cpu",
     }

@@ -78,25 +78,36 @@ def run(request):
             .tz_localize(None)
         )
 
-    with torch.inference_mode():
-        prediction = predictor.predict(
-            df=frame,
-            x_timestamp=timestamps("historical_timestamps"),
-            y_timestamp=timestamps("future_timestamps"),
-            pred_len=len(prepared["future_timestamps"]),
-            T=config["temperature"],
-            top_p=config["top_p"],
-            sample_count=config["sample_count"],
-            verbose=False,
-        )
-    candles = []
-    for timestamp, (_, row) in zip(
-        prepared["future_timestamps"], prediction.iterrows(), strict=True
-    ):
-        candles.append(
-            dict(session=timestamp[:10], **{c: float(row[c]) for c in columns if c != "amount"})
-        )
-    return {"candles": candles, "device": device}
+    paths = []
+    for index in range(config["sample_count"]):
+        seed = (config["seed"] + index) % 2**32
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if device == "cuda":
+            torch.cuda.manual_seed_all(seed)
+        # Upstream averages sample_count>1 internally. Request one draw at a
+        # time to retain complete trajectories instead of an averaged path.
+        with torch.inference_mode():
+            prediction = predictor.predict(
+                df=frame,
+                x_timestamp=timestamps("historical_timestamps"),
+                y_timestamp=timestamps("future_timestamps"),
+                pred_len=len(prepared["future_timestamps"]),
+                T=config["temperature"],
+                top_p=config["top_p"],
+                sample_count=1,
+                verbose=False,
+            )
+        candles = []
+        for timestamp, (_, row) in zip(
+            prepared["future_timestamps"], prediction.iterrows(), strict=True
+        ):
+            candles.append(
+                dict(session=timestamp[:10], **{c: float(row[c]) for c in columns if c != "amount"})
+            )
+        paths.append(candles)
+    return {"paths": paths, "device": device}
 
 
 if __name__ == "__main__":
