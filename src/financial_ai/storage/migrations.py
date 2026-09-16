@@ -307,6 +307,20 @@ def _downgrade_0007(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE IF EXISTS qa_history")
 
 
+def _upgrade_0008(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE model_runs (
+        sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
+        scope_key TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+        created_at TEXT NOT NULL, payload_json TEXT NOT NULL)""")
+    connection.execute(
+        "CREATE INDEX idx_model_runs_scope ON model_runs(scope_key, kind, sequence DESC)"
+    )
+
+
+def _downgrade_0008(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE IF EXISTS model_runs")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -315,4 +329,5 @@ MIGRATIONS = (
     Migration(5, "research_graph_checkpoints", _upgrade_0005, _downgrade_0005),
     Migration(6, "evidence_backed_reports", _upgrade_0006, _downgrade_0006),
     Migration(7, "research_qa_history", _upgrade_0007, _downgrade_0007),
+    Migration(8, "model_run_quality_history", _upgrade_0008, _downgrade_0008),
 )

@@ -87,7 +87,12 @@ class LocalKronosProvider:
             db.execute("DELETE FROM forecasts WHERE expires<=?", (time.time(),))
             row = db.execute("SELECT payload FROM forecasts WHERE key=?", (key,)).fetchone()
         if row:
-            return dict(json.loads(row[0]), cache_hit=True)
+            return dict(
+                json.loads(row[0]),
+                cache_hit=True,
+                quality={"status": "experimental"},
+                research_only=True,
+            )
         request.update(assets=str(self.assets.resolve()), source=str(self.source.resolve()))
         try:
             result = self._execute(request)
@@ -104,6 +109,8 @@ class LocalKronosProvider:
                 "Kronos timed out; worker terminated and no forecast cached"
             ) from None
         output = {
+            "quality": {"status": "experimental"},
+            "research_only": True,
             "model_id": manifest.artifacts[0].repository,
             "tokenizer_id": manifest.artifacts[1].repository,
             **summary,

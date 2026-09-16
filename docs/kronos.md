@@ -121,6 +121,9 @@ not validate downloaded weights, real-model accuracy, or GPU performance.
 
 ## Probabilistic paths
 
+For persisted evaluation/inference records and promotion rules, see
+[the Kronos quality gate](kronos-quality.md). Direct inference remains experimental.
+
 For point-in-time strategy evaluation, see [the walk-forward engine](backtesting.md).
 It requires trustworthy data and model-training cutoffs; Kronos integration and
 forecast calibration are separate from the engine itself.
