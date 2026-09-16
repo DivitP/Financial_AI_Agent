@@ -30,6 +30,7 @@ from financial_ai.api.schemas import (
     ResearchSnapshotResponse,
     ReportResponse,
     VersionResponse,
+    KronosResponse,
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
 from financial_ai.llm import validate_chat_configuration
@@ -39,6 +40,7 @@ from financial_ai.retrieval.qa import ResearchQA, Question, AnswerRejected
 from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.workflow.jobs import Job, LocalResearchJobRunner
+from financial_ai.workflow.kronos import KronosWorkflowNode
 
 
 API_VERSION = "v1"
@@ -73,6 +75,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     app.state.database = database
     app.state.repository = repository
     app.state.runner = runner
+    app.state.kronos = KronosWorkflowNode(repository, get_settings())
     app.state.qa = ResearchQA(
         ResearchIndex(database, Path(database_path).with_suffix(".index.db")),
         create_chat_provider(get_settings()),
@@ -219,11 +222,37 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             ResearchSnapshotResponse(
                 lane=row["lane"],
                 status=row["status"],
-                payload=json.loads(row["payload_json"]) if row["payload_json"] else None,
+                payload=(
+                    app.state.kronos.read(run_id).model_dump(mode="json")
+                    if row["lane"] == "kronos"
+                    else json.loads(row["payload_json"])
+                    if row["payload_json"]
+                    else None
+                ),
                 error_message=row["error_message"],
             )
             for row in repository.snapshots(run_id)
         ]
+
+    @app.get(
+        "/api/v1/research-runs/{run_id}/forecast", response_model=KronosResponse, tags=["research"]
+    )
+    def get_forecast(run_id: UUID, include_experimental: bool = False):
+        _run_or_error(repository, run_id)
+        return app.state.kronos.read(run_id, include_experimental=include_experimental)
+
+    @app.post(
+        "/api/v1/research-runs/{run_id}/forecast", response_model=KronosResponse, tags=["research"]
+    )
+    async def run_forecast(run_id: UUID, include_experimental: bool = False):
+        _run_or_error(repository, run_id)
+        try:
+            await app.state.kronos.run(run_id)
+        except Exception:
+            repository.upsert_snapshot(
+                run_id, "kronos", "failed", None, "Optional forecast unavailable"
+            )
+        return app.state.kronos.read(run_id, include_experimental=include_experimental)
 
     @app.get(
         "/api/v1/research-runs/{run_id}/reports/latest",

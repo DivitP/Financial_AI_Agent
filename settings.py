@@ -83,6 +83,11 @@ class Settings(BaseSettings):
         default="cpu", validation_alias="KRONOS_DEVICE"
     )
     kronos_allow_downloads: bool = Field(default=False, validation_alias="KRONOS_ALLOW_DOWNLOADS")
+    kronos_timeout_seconds: float = Field(
+        default=120, gt=0, le=600, validation_alias="KRONOS_TIMEOUT_SECONDS"
+    )
+    kronos_max_retries: int = Field(default=1, ge=0, le=3, validation_alias="KRONOS_MAX_RETRIES")
+    kronos_policy_path: Path | None = Field(default=None, validation_alias="KRONOS_POLICY_PATH")
 
     @field_validator("groq_model", "local_llm_model", "kronos_model")
     @classmethod

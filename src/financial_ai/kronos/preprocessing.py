@@ -55,6 +55,7 @@ class CorporateAction(InputModel):
 
 
 class PreparedCandles(InputModel):
+    instrument: str | None = None
     candles: list[Candle]
     historical_timestamps: list[AwareDatetime]
     future_timestamps: list[AwareDatetime]

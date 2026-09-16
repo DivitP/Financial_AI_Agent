@@ -75,6 +75,9 @@ small/base-tokenizer pairing is reviewed.
 
 ## Local inference
 
+For optional research orchestration and HTTP endpoints, see
+[the forecast workflow/API](kronos-workflow.md).
+
 After preparing the pinned local assets above, use the provider with the output
 of `prepare_candles`:
 
@@ -112,8 +115,8 @@ be finite and internally consistent; invalid outputs are rejected, not repaired.
 Missing turnover is explicitly encoded as a zero input placeholder, preventing
 upstream's automatic synthetic turnover estimate; this may affect model quality
 and is disclosed in warnings. It is never returned as observed turnover.
-No confidence or trading recommendation is produced. This callable provider is
-not yet scheduled by the research workflow or exposed as a forecast UI.
+No confidence or trading recommendation is produced. The optional research lane
+and forecast API wrap this provider; no forecast UI is included yet.
 
 Offline tests exercise the worker with a fixture model/tokenizer on CPU, device
 failures, cache hits/expiry, and real subprocess timeout/error handling. They do

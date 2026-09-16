@@ -8,6 +8,7 @@ from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from financial_ai.domain.forecast import KronosResponse, KronosForecastData
 
 
 class ApiSchema(BaseModel):
@@ -19,6 +20,8 @@ class CreateResearchJobRequest(ApiSchema):
     investment_horizon: Literal["short", "medium", "long"] | None = None
     risk_lens: Literal["conservative", "balanced", "growth"] | None = None
     thesis: str | None = Field(default=None, max_length=500)
+    include_kronos: bool = False
+    forecast_horizon: int = Field(default=5, ge=1, le=128)
 
     @field_validator("ticker")
     @classmethod

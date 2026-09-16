@@ -100,9 +100,10 @@ to experimental; expired validation must be rerun. Validity age is measured from
 evaluation execution, not the age of its historical dataset: reviewers must select
 a relevant holdout period and account for regime changes.
 
-No forecast API/UI currently consumes these records. A future consumer must use
-the normal visibility query or an explicitly labelled experimental research view;
-it must not query the raw audit table as a promoted feed. The direct provider
+The [forecast API/workflow](kronos-workflow.md) now consumes these records and
+applies the same eligibility rules. Future UI consumers must use filtered API
+output or an explicitly labelled experimental research view;
+they must not query the raw audit table as a promoted feed. The direct provider
 always labels its output experimental and does not itself write this audit log.
 
 This is a trusted local research service, not a tamper-proof attestation: callback
