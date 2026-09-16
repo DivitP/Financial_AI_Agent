@@ -85,6 +85,36 @@ def test_workflow_api_cache_and_experimental_isolation(tmp_path, monkeypatch):
     assert client.get(endpoint).json()["forecast"] is None
     data = client.get(endpoint + "?include_experimental=true").json()
     assert data["status"] == "completed" and data["forecast"]["research_only"]
+    assert len(data["forecast"]["historical_candles"]) == 4
+    with app.state.database.connect() as db:
+        scope_key = db.execute(
+            "SELECT scope_key FROM model_runs WHERE id=?", (data["model_run_id"],)
+        ).fetchone()[0]
+    node.quality.repository.append(
+        scope_key,
+        "evaluation",
+        "experimental",
+        {
+            "policy": node.quality.policy.model_dump(mode="json"),
+            "reasons": ["insufficient_windows"],
+            "limitations": ["Fixture only"],
+            "comparison": {
+                "models": {
+                    "kronos": {
+                        "mean_window_metrics": {"mae": 2, "mase": None},
+                        "turnover": 1,
+                        "max_fold_end_drawdown": 0.1,
+                        "windows": [
+                            {"as_of": "2026-01-01", "forecast": {"sessions": ["2026-01-02"]}}
+                        ],
+                    }
+                }
+            },
+        },
+    )
+    validation = client.get(endpoint).json()["validation"]
+    assert validation["models"]["kronos"]["metrics"]["mae"] == 2
+    assert validation["reasons"] == ["insufficient_windows"]
     assert len(calls) == 1
     repeated = client.post(endpoint + "?include_experimental=true").json()
     assert repeated["forecast"]["cache_hit"] and len(calls) == 1

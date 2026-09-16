@@ -35,6 +35,31 @@ class KronosWorkflowNode:
                 eligible = (
                     self.quality.eligibility(scope, as_of=datetime.now(UTC))["status"] == "promoted"
                 )
+                evaluations = self.quality.repository.history(scope.key, "evaluation")
+                if evaluations:
+                    evaluation = evaluations[0]
+                    payload = evaluation["payload"]
+                    response.validation = {
+                        "id": evaluation["id"],
+                        "status": evaluation["status"],
+                        "created_at": evaluation["created_at"],
+                        "reasons": payload.get("reasons", []),
+                        "limitations": payload.get("limitations", []),
+                        "models": {
+                            name: {
+                                "metrics": model["mean_window_metrics"],
+                                "turnover": model["turnover"],
+                                "drawdown": model["max_fold_end_drawdown"],
+                                "windows": [
+                                    {"as_of": w["as_of"], "sessions": w["forecast"]["sessions"]}
+                                    for w in model["windows"]
+                                ],
+                            }
+                            for name, model in payload.get("comparison", {})
+                            .get("models", {})
+                            .items()
+                        },
+                    }
         if not eligible or response.quality != "promoted":
             response.quality = "experimental"
             if response.forecast:
@@ -169,6 +194,7 @@ class KronosWorkflowNode:
                 if record["status"] != "completed":
                     raise RuntimeError("Local forecast unavailable")
                 result = KronosForecastData.model_validate(record["result"])
+                result.historical_candles = [c.model_dump(mode="json") for c in prepared.candles]
                 response = KronosResponse(
                     status="completed",
                     quality=record["quality"]["status"],

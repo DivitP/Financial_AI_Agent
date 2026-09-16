@@ -95,5 +95,34 @@ make check
 Fixtures cover successful inference, retry exhaustion without broader run failure,
 safe errors, saved failure audits, cache hits/ticker isolation, SSE progress,
 experimental visibility, cancellation, invalid horizons, and missing inputs.
-They do not load real weights or verify accelerator performance. No frontend
-forecast panel is included in this API/workflow change.
+They do not load real weights or verify accelerator performance.
+
+## Forecast web view
+
+Select **Include optional Kronos research** when starting research, then open
+**Forecast research and model card** from the run dashboard. The route is
+`/runs/{run_id}/forecast`. Forecast execution remains explicit; polling only reads
+saved output. **Show experimental research forecasts** is unchecked by default.
+The run/retry button uses existing collector snapshots, not live data fabrication.
+
+The responsive SVG chart shows up to the last 60 prepared historical candles,
+a forecast boundary, 5–95% and 25–75% sampled bands and a dashed median. The
+median is labelled as a sample statistic, never a guaranteed target. Missing,
+single-sample or invalid bands suppress the chart rather than showing a standalone
+prediction line. An expandable data table supplies accessible chart values.
+Lower/median/upper terminal scenarios are percentile outcomes, not assigned
+bull/base/bear probabilities.
+
+The model card records version, cutoff, provider, currency, timezone, adjustment
+basis, device, path count and warnings. New workflow snapshots retain the prepared
+historical candles; older saved forecasts may not have them. The API adds a
+read-only summary of the latest matching evaluation, including baseline metrics,
+test-window dates, failure reasons and limitations. No evaluation record means
+the UI says validation is unavailable. It never generates placeholder metrics.
+Coverage/direction/drawdown fractions are formatted as percentages (0.9 = 90%);
+undefined metrics remain unavailable. Validation results do not remove uncertainty.
+
+Verification additionally includes component accessibility checks and
+`npm --prefix frontend/web run test:e2e -- forecast.spec.ts` for desktop/mobile
+rendering and explicit experimental opt-in. The browser test uses offline API
+fixtures and does not demonstrate real model accuracy.

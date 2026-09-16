@@ -4,7 +4,7 @@ export type LaneStatus = "completed" | "failed";
 export interface ResearchRun { id: string; status: RunStatus; ticker: string; asset_type?: "equity" | "etf"; correlation_id: string }
 export interface ResearchSnapshot { lane: string; status: LaneStatus; payload: Record<string, unknown> | null; error_message: string | null }
 export interface ResearchReport { id: string; run_id: string; version: number; as_of: string; model_configuration: Record<string, string>; decision_brief: string[]; sections: { title: string; findings: { summary: string; evidence_ids: string[] }[] }[]; evidence_links: Record<string, string> }
-export interface ResearchRequest { ticker: string; investment_horizon?: string; risk_lens?: string; thesis?: string }
+export interface ResearchRequest { ticker: string; investment_horizon?: string; risk_lens?: string; thesis?: string; include_kronos?: boolean; forecast_horizon?: number }
 export interface ApiFailure extends Error { code?: string; correlationId?: string }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -20,6 +20,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const researchApi = {
+  forecast: (id: string, experimental: boolean, execute = false) => request<ForecastResponse>(`/api/v1/research-runs/${id}/forecast?include_experimental=${experimental}`, execute ? { method: "POST" } : undefined),
   create: (payload: ResearchRequest) => request<ResearchRun>("/api/v1/research-runs", { method: "POST", body: JSON.stringify(payload) }),
   get: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}`),
   snapshots: async (id: string) => {
@@ -35,6 +36,17 @@ export const researchApi = {
   cancel: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}/cancel`, { method: "POST" }),
   retry: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}/retry`, { method: "POST" }),
 };
+
+export interface ForecastCandle { session: string; open: string | number; high: string | number; low: string | number; close: string | number }
+export interface ForecastBand { session: string; close_percentiles: Record<string, string | number> }
+export interface ForecastResponse {
+  status: string; quality: string; warning?: string | null;
+  forecast?: { model_version: string; device: string; as_of: string; currency?: string; timezone?: string; provider?: string; adjustment_policy?: string;
+    historical_candles?: ForecastCandle[]; candles: ForecastCandle[]; warnings?: string[];
+    summary?: { sample_count: number; bands: ForecastBand[]; direction_probability?: Record<string, number> } } | null;
+  validation?: { id: string; status: string; created_at: string; reasons: string[]; limitations: string[];
+    models: Record<string, { metrics: Record<string, number | null>; turnover: number; drawdown: number; windows: { as_of: string; sessions: string[] }[] }> } | null;
+}
 
 export function subscribeToRun(id: string, onEvent: (event: MessageEvent<string>) => void, onError: () => void): EventSource {
   const source = new EventSource(`/api/v1/research-runs/${id}/events`);

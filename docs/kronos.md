@@ -116,7 +116,8 @@ Missing turnover is explicitly encoded as a zero input placeholder, preventing
 upstream's automatic synthetic turnover estimate; this may affect model quality
 and is disclosed in warnings. It is never returned as observed turnover.
 No confidence or trading recommendation is produced. The optional research lane
-and forecast API wrap this provider; no forecast UI is included yet.
+and forecast API wrap this provider; the web forecast view adds sampled bands and
+a model card without treating the median as a guaranteed target.
 
 Offline tests exercise the worker with a fixture model/tokenizer on CPU, device
 failures, cache hits/expiry, and real subprocess timeout/error handling. They do

@@ -26,3 +26,4 @@ class KronosResponse(BaseModel):
     cache_key: str | None = None
     model_run_id: str | None = None
     forecast: KronosForecastData | None = None
+    validation: dict[str, object] | None = None

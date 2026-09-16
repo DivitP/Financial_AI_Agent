@@ -3,11 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { ApiFailure, researchApi, ResearchReport, ResearchRequest, ResearchSnapshot, subscribeToRun } from "./api";
 import { ResearchChat } from "./ResearchChat";
+import { ForecastPage } from "./ForecastPanel";
 
 const tickerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$/;
 
 export function App() {
-  return <Routes><Route path="/" element={<ResearchForm />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>;
+  return <Routes><Route path="/" element={<ResearchForm />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>;
 }
 
 function ResearchForm() {
@@ -21,6 +22,8 @@ function ResearchForm() {
     <small id="ticker-help">Letters, numbers, periods, underscores, or hyphens; up to 15 characters.</small>{form.ticker && !valid && <p id="ticker-error" className="field-error" role="alert">Enter a valid ticker symbol.</p>}
     <div className="form-grid"><label>Investment horizon<select value={form.investment_horizon} onChange={(e) => setForm({ ...form, investment_horizon: e.target.value })}><option value="short">Short term</option><option value="medium">Medium term</option><option value="long">Long term</option></select></label><label>Risk lens<select value={form.risk_lens} onChange={(e) => setForm({ ...form, risk_lens: e.target.value })}><option value="balanced">Balanced</option><option value="conservative">Conservative</option><option value="growth">Growth</option></select></label></div>
     <label htmlFor="thesis">Optional thesis</label><textarea id="thesis" value={form.thesis} onChange={(e) => setForm({ ...form, thesis: e.target.value })} maxLength={500} placeholder="What are you looking to validate?" />
+    <label className="forecast-opt-in"><input type="checkbox" checked={!!form.include_kronos} onChange={e => setForm({ ...form, include_kronos: e.target.checked })} /> Include optional Kronos research (requires local setup)</label>
+    {form.include_kronos && <label>Forecast sessions<select value={form.forecast_horizon ?? 5} onChange={e => setForm({ ...form, forecast_horizon: Number(e.target.value) })}>{[1, 5, 10, 20].map(n => <option key={n} value={n}>{n} exchange sessions</option>)}</select></label>}
     {mutation.error && <ErrorNotice error={mutation.error as ApiFailure} />}<button type="submit" disabled={!valid || mutation.isPending}>{mutation.isPending ? "Starting research…" : "Start research"}</button>
   </form></main></Shell>;
 }
@@ -36,6 +39,7 @@ function ResearchDashboard() {
   if (run.isLoading) return <Shell><Loading /></Shell>; if (run.error || !run.data) return <Shell><ErrorNotice error={run.error as ApiFailure} /></Shell>;
   return <Shell><main><Link to="/" className="back-link">← New research</Link><header className="run-header"><div><p className="eyebrow">Research run</p><h1>{run.data.ticker}</h1><p className="muted">{streamState}</p></div><Status status={run.data.status} /></header>
     <Progress snapshots={snapshots.data ?? []} status={run.data.status} />
+    <p><Link to={`/runs/${runId}/forecast`}>Forecast research and model card →</Link></p>
     <ResearchChat key={runId} runId={runId} />
     <div className="actions">{active(run.data.status) && <button className="secondary" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel run</button>}{["failed", "cancelled"].includes(run.data.status) && <button onClick={() => retry.mutate()} disabled={retry.isPending}>Retry research</button>}</div>
     {run.data.status === "completed" && <Overview snapshots={snapshots.data ?? []} ticker={run.data.ticker} assetType={run.data.asset_type ?? "equity"} report={report.data} />}{snapshots.error && <ErrorNotice error={snapshots.error as ApiFailure} />}
