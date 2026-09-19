@@ -190,13 +190,25 @@ class ResearchRepository:
 
         def write(active: sqlite3.Connection) -> None:
             existing = active.execute(
-                "SELECT id FROM reports WHERE run_id=? AND version=?", (_id(run_id), version)
+                "SELECT * FROM reports WHERE run_id=? AND version=?", (_id(run_id), version)
             ).fetchone()
             if existing is not None:
-                active.execute(
-                    "DELETE FROM report_evidence_links WHERE report_id=?", (existing["id"],)
-                )
-                active.execute("DELETE FROM reports WHERE id=?", (existing["id"],))
+                links = {
+                    r["evidence_id"]: r["exact_url"]
+                    for r in active.execute(
+                        "SELECT evidence_id, exact_url FROM report_evidence_links WHERE report_id=?",
+                        (existing["id"],),
+                    )
+                }
+                if (
+                    existing["as_of"] == _timestamp(as_of)
+                    and json.loads(existing["model_config_json"]) == model_config
+                    and json.loads(existing["decision_brief_json"]) == decision_brief
+                    and json.loads(existing["sections_json"]) == sections
+                    and links == {str(k): v for k, v in evidence_links.items()}
+                ):
+                    return  # Idempotent replay; never replace its original snapshots.
+                raise ValueError("Report versions are immutable; save a new version")
             active.execute(
                 """
                 INSERT INTO reports(id, run_id, version, as_of, model_config_json, decision_brief_json,
@@ -220,6 +232,17 @@ class ResearchRepository:
                     (_id(report_id), _id(evidence_id), url)
                     for evidence_id, url in evidence_links.items()
                 ],
+            )
+            snapshots = [
+                dict(r)
+                for r in active.execute(
+                    "SELECT lane, status, payload_json, error_message, created_at, updated_at FROM research_snapshots WHERE run_id=? AND lane != 'kronos' ORDER BY id",
+                    (_id(run_id),),
+                )
+            ]
+            active.execute(
+                "INSERT INTO report_history VALUES (?, ?)",
+                (_id(report_id), json.dumps(snapshots, sort_keys=True)),
             )
 
         if connection is not None:

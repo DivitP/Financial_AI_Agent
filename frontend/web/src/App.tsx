@@ -4,11 +4,12 @@ import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-rou
 import { ApiFailure, researchApi, ResearchReport, ResearchRequest, ResearchSnapshot, subscribeToRun } from "./api";
 import { ResearchChat } from "./ResearchChat";
 import { ForecastPage } from "./ForecastPanel";
+import { HistoryPage, SavedRunPage } from "./ResearchHistory";
 
 const tickerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$/;
 
 export function App() {
-  return <Routes><Route path="/" element={<ResearchForm />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>;
+  return <Routes><Route path="/" element={<ResearchForm />} /><Route path="/history" element={<HistoryPage />} /><Route path="/history/:runId" element={<SavedRunPage />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>;
 }
 
 function ResearchForm() {
@@ -63,7 +64,7 @@ function TechnicalPanel({ data }: { data: Record<string, unknown> | null }) { re
 
 function EvidenceDrawer({ snapshot, onClose }: { snapshot: ResearchSnapshot; onClose: () => void }) { const urls = collectUrls(snapshot.payload); return <aside className="drawer" aria-label={`${snapshot.lane} evidence`} aria-modal="true" role="dialog"><button className="secondary close" onClick={onClose}>Close</button><h2>{snapshot.lane} evidence</h2><pre>{JSON.stringify(snapshot.payload, null, 2)}</pre><h3>Exact links</h3>{urls.length ? <ul>{urls.map((url) => <li key={url}><a href={url} target="_blank" rel="noreferrer">{url}</a></li>)}</ul> : <p>No source URLs are available for this lane yet.</p>}</aside>; }
 
-function Shell({ children }: { children: React.ReactNode }) { return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/" className="brand">Financial AI <span>Research</span></Link><a href="/docs">API docs</a></nav>{children}<footer>Evidence-first research. Not investment advice.</footer></div>; }
+function Shell({ children }: { children: React.ReactNode }) { return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/" className="brand">Financial AI <span>Research</span></Link><Link to="/history">Saved research</Link><a href="/docs">API docs</a></nav>{children}<footer>Evidence-first research. Not investment advice.</footer></div>; }
 function Status({ status }: { status: string }) { return <span className={`status status-${status}`}>{status}</span>; }
 function Loading() { return <p className="loading" role="status">Loading research run…</p>; }
 function ErrorNotice({ error }: { error: ApiFailure | null | undefined }) { return <section className="error" role="alert"><strong>We could not complete that request.</strong><p>{error?.message ?? "Try again in a moment."}</p>{error?.correlationId && <small>Reference: {error.correlationId}</small>}</section>; }

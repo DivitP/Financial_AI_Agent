@@ -3,9 +3,11 @@ export type LaneStatus = "completed" | "failed";
 
 export interface ResearchRun { id: string; status: RunStatus; ticker: string; asset_type?: "equity" | "etf"; correlation_id: string }
 export interface ResearchSnapshot { lane: string; status: LaneStatus; payload: Record<string, unknown> | null; error_message: string | null }
-export interface ResearchReport { id: string; run_id: string; version: number; as_of: string; model_configuration: Record<string, string>; decision_brief: string[]; sections: { title: string; findings: { summary: string; evidence_ids: string[] }[] }[]; evidence_links: Record<string, string> }
+export interface ResearchReport { id: string; run_id: string; version: number; as_of: string; model_configuration: Record<string, string>; decision_brief: string[]; sections: { title: string; findings: { summary: string; evidence_ids: string[]; limitations?: string[] }[] }[]; evidence_links: Record<string, string> }
 export interface ResearchRequest { ticker: string; investment_horizon?: string; risk_lens?: string; thesis?: string; include_kronos?: boolean; forecast_horizon?: number }
 export interface ApiFailure extends Error { code?: string; correlationId?: string }
+export interface HistoryItem { id: string; ticker: string; status: RunStatus; requested_at: string; name: string | null; archived: boolean; report_count: number }
+export interface HistoryView { run: Omit<HistoryItem, "report_count">; versions: { version: number; as_of: string; created_at: string }[]; report: ResearchReport | null; snapshots: ResearchSnapshot[]; notice: string }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { headers: { "Content-Type": "application/json", ...init?.headers }, ...init });
@@ -20,6 +22,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const researchApi = {
+  history: (filters: Record<string, string>) => request<HistoryItem[]>(`/api/v1/research-runs?${new URLSearchParams(filters)}`),
+  saved: (id: string, version: string | null) => request<HistoryView>(`/api/v1/research-runs/${id}/history${version ? `?version=${encodeURIComponent(version)}` : ""}`),
+  updateHistory: (id: string, fields: { name?: string | null; archived?: boolean }) => request<HistoryView>(`/api/v1/research-runs/${id}/history`, { method: "PATCH", body: JSON.stringify(fields) }),
   forecast: (id: string, experimental: boolean, execute = false) => request<ForecastResponse>(`/api/v1/research-runs/${id}/forecast?include_experimental=${experimental}`, execute ? { method: "POST" } : undefined),
   create: (payload: ResearchRequest) => request<ResearchRun>("/api/v1/research-runs", { method: "POST", body: JSON.stringify(payload) }),
   get: (id: string) => request<ResearchRun>(`/api/v1/research-runs/${id}`),

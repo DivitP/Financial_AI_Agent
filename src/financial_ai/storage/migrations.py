@@ -321,6 +321,19 @@ def _downgrade_0008(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE IF EXISTS model_runs")
 
 
+def _upgrade_0009(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE run_history_metadata (
+        run_id TEXT PRIMARY KEY REFERENCES research_runs(id), name TEXT,
+        archived INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)""")
+    connection.execute("""CREATE TABLE report_history (
+        report_id TEXT PRIMARY KEY REFERENCES reports(id), snapshots_json TEXT NOT NULL)""")
+
+
+def _downgrade_0009(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE IF EXISTS report_history")
+    connection.execute("DROP TABLE IF EXISTS run_history_metadata")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -330,4 +343,5 @@ MIGRATIONS = (
     Migration(6, "evidence_backed_reports", _upgrade_0006, _downgrade_0006),
     Migration(7, "research_qa_history", _upgrade_0007, _downgrade_0007),
     Migration(8, "model_run_quality_history", _upgrade_0008, _downgrade_0008),
+    Migration(9, "saved_research_history", _upgrade_0009, _downgrade_0009),
 )

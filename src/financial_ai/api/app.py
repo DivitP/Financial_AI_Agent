@@ -6,10 +6,10 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import AsyncIterator
-from uuid import UUID, uuid4
+from typing import AsyncIterator, Literal
+from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
 
-from fastapi import FastAPI, Header, Request
+from fastapi import FastAPI, Header, Request, Query
 from fastapi.responses import StreamingResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -31,6 +31,8 @@ from financial_ai.api.schemas import (
     ReportResponse,
     VersionResponse,
     KronosResponse,
+    HistoryUpdate,
+    HistoryItem,
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
 from financial_ai.llm import validate_chat_configuration
@@ -39,6 +41,7 @@ from financial_ai.retrieval.index import ResearchIndex
 from financial_ai.retrieval.qa import ResearchQA, Question, AnswerRejected
 from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
+from financial_ai.storage.history import ResearchHistory
 from financial_ai.workflow.jobs import Job, LocalResearchJobRunner
 from financial_ai.workflow.kronos import KronosWorkflowNode
 
@@ -62,6 +65,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     database = Database(database_path)
     database.migrate_to_latest()
     repository = ResearchRepository(database)
+    history = ResearchHistory(database)
     runner = LocalResearchJobRunner(database)
     logger = configure_logging()
 
@@ -153,12 +157,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         "/api/v1/research-jobs", response_model=JobResponse, status_code=202, tags=["research"]
     )
     def create_research_job(payload: CreateResearchJobRequest, request: Request) -> JobResponse:
-        instrument = Instrument(
-            id=uuid4(),
-            symbol=payload.ticker,
-            asset_type=AssetType.EQUITY,
-            currency="USD",
-        )
+        instrument = _saved_instrument(database, payload.ticker)
         run = ResearchRun(
             id=uuid4(),
             instrument_id=instrument.id,
@@ -182,9 +181,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     def create_research_run(
         payload: CreateResearchJobRequest, request: Request
     ) -> ResearchRunResponse:
-        instrument = Instrument(
-            id=uuid4(), symbol=payload.ticker, asset_type=AssetType.EQUITY, currency="USD"
-        )
+        instrument = _saved_instrument(database, payload.ticker)
         run = ResearchRun(
             id=uuid4(),
             instrument_id=instrument.id,
@@ -203,6 +200,32 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             asset_type=instrument.asset_type.value,
             correlation_id=request.state.correlation_id,
         )
+
+    @app.get("/api/v1/research-runs", response_model=list[HistoryItem], tags=["history"])
+    def list_history(
+        q: str = Query(default="", max_length=80),
+        status: Literal["pending", "running", "completed", "failed", "cancelled"] | None = None,
+        archive: Literal["active", "archived", "all"] = "active",
+        limit: int = Query(default=20, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ):
+        return history.list(q=q, status=status, archive=archive, limit=limit, offset=offset)
+
+    @app.patch("/api/v1/research-runs/{run_id}/history", tags=["history"])
+    def update_history(run_id: UUID, payload: HistoryUpdate):
+        _run_or_error(repository, run_id)
+        history.update(run_id, payload.model_dump(exclude_unset=True))
+        return history.reopen(run_id)
+
+    @app.get("/api/v1/research-runs/{run_id}/history", tags=["history"])
+    def reopen_history(run_id: UUID, version: int | None = Query(default=None, ge=1)):
+        _run_or_error(repository, run_id)
+        try:
+            return history.reopen(run_id, version)
+        except KeyError:
+            raise ApiError(
+                "report_version_not_found", "Saved report version was not found.", 404
+            ) from None
 
     @app.get(
         "/api/v1/research-runs/{run_id}", response_model=ResearchRunResponse, tags=["research"]
@@ -403,6 +426,20 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
 def _job_response(job: Job, correlation_id: str) -> JobResponse:
     return JobResponse(
         id=job.id, run_id=job.run_id, status=job.status, correlation_id=correlation_id
+    )
+
+
+def _saved_instrument(database: Database, ticker: str) -> Instrument:
+    with database.connect() as db:
+        row = db.execute(
+            "SELECT * FROM instruments WHERE symbol=? AND asset_type='equity' AND exchange=''",
+            (ticker,),
+        ).fetchone()
+    return Instrument(
+        id=UUID(row["id"]) if row else uuid5(NAMESPACE_URL, "financial-ai:equity:" + ticker),
+        symbol=ticker,
+        asset_type=AssetType.EQUITY,
+        currency=row["currency"] if row else "USD",
     )
 
 

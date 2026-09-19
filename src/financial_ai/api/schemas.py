@@ -85,3 +85,23 @@ class JobEventResponse(ApiSchema):
     kind: str
     payload: dict[str, object]
     created_at: datetime
+
+
+class HistoryUpdate(ApiSchema):
+    name: str | None = Field(default=None, max_length=80)
+    archived: bool = False
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value):
+        return value.strip() or None if value is not None else None
+
+
+class HistoryItem(BaseModel):
+    id: str
+    ticker: str
+    status: str
+    requested_at: str
+    name: str | None
+    archived: bool
+    report_count: int

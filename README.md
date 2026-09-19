@@ -96,6 +96,10 @@ the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
 
 ## Usage
 
+For the React application, open **Saved research** to filter, name, archive, and
+reopen stored report versions without refreshing their data. See
+[saved research history](docs/history.md) for API details and legacy limitations.
+
 1. Enter a ticker symbol in the form.
 2. View the generated report with the following structure:
   * Executive Summary
