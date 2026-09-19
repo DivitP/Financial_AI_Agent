@@ -80,6 +80,7 @@ default-groups = ["dev"]
 addopts = "-ra --strict-markers --cov=agents --cov=frontend --cov=main --cov=settings --cov-report=term-missing"
 pythonpath = [".", "src"]
 testpaths = ["tests"]
+markers = ["kronos_benchmark: explicit standalone Kronos benchmark suite (outside fast testpaths)"]
 
 [tool.coverage.run]
 branch = true

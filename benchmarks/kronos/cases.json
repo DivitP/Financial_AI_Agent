@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "provenance": "Synthetic authored cases; ticker labels are illustrative, not historical market observations.",
+  "sessions": [3, 4, 8, 9, 10, 11, 14, 15, 16, 17, 18, 21],
+  "cases": [
+    {"id": "aapl_trend", "symbol": "AAPL", "asset_type": "equity", "regime": "trend", "prices": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110]},
+    {"id": "msft_quiet", "symbol": "MSFT", "asset_type": "equity", "regime": "quiet", "prices": [100, 100, 101, 100, 100, 101, 100, 100, 101, 100, 100]},
+    {"id": "nvda_volatile", "symbol": "NVDA", "asset_type": "equity", "regime": "volatile", "prices": [100, 112, 97, 120, 90, 115, 105, 125, 100, 130, 110]},
+    {"id": "spy_etf", "symbol": "SPY", "asset_type": "etf", "regime": "trend", "prices": [100, 101, 100, 102, 102, 103, 104, 103, 105, 104, 105]},
+    {"id": "qqq_drawdown", "symbol": "QQQ", "asset_type": "etf", "regime": "drawdown", "prices": [120, 118, 116, 110, 105, 102, 98, 95, 94, 92, 90]},
+    {"id": "aapl_split", "symbol": "AAPL", "asset_type": "equity", "regime": "split", "prices": [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100], "split": true},
+    {"id": "missing_volume", "symbol": "SPY", "asset_type": "etf", "regime": "missing_volume", "prices": [100, 101, 100, 102, 102, 103, 104, 103, 105, 104, 105], "reject": "volume"},
+    {"id": "one_session", "symbol": "MSFT", "asset_type": "equity", "regime": "short_history", "prices": [100, 101, 102, 103], "context": 1, "reject": "Insufficient contiguous"},
+    {"id": "two_sessions", "symbol": "MSFT", "asset_type": "equity", "regime": "short_history", "prices": [100, 101, 102, 103, 104], "context": 2}
+  ]
+}

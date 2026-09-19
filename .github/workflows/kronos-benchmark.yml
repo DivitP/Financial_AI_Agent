@@ -1,0 +1,34 @@
+name: Kronos offline regression benchmark
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.4"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked --all-groups
+      - name: Offline suite and deliberate-regression checks
+        run: uv run pytest benchmarks/kronos --no-cov -q
+      - name: Record hardware and runtime report
+        if: always()
+        run: uv run python -m benchmarks.kronos.run --output data/runtime/benchmarks/kronos-fixture.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kronos-fixture-benchmark
+          path: data/runtime/benchmarks/kronos-fixture.json
+          retention-days: 14

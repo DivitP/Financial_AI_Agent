@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "fixture": {"max_case_seconds": 15, "max_mae": 25, "max_rmse": 30},
+  "local": {"max_case_seconds": 1300, "max_mae": 50, "max_rmse": 60},
+  "reference_relative_tolerance": 0.05,
+  "reference_absolute_tolerance": 0.000001
+}

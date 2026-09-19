@@ -38,3 +38,8 @@ frontend-build:
 	npm --prefix frontend/web run build
 
 check: lint format typecheck test frontend-lint frontend-test frontend-build
+
+.PHONY: kronos-benchmark
+kronos-benchmark:
+	$(PYTHON) -m pytest benchmarks/kronos --no-cov -q
+	$(PYTHON) -m benchmarks.kronos.run --output data/runtime/benchmarks/kronos-fixture.json

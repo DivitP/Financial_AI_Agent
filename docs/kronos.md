@@ -1,5 +1,8 @@
 # Optional Kronos environment
 
+See [the separate benchmark suite](kronos-benchmarks.md) for reproducibility gates,
+synthetic edge cases, hardware metadata and opt-in real-weight measurements.
+
 ## Daily candle preparation
 
 `financial_ai.kronos.preprocessing.prepare_candles` takes typed daily `Candle`
