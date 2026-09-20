@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { researchApi } from "./api";
 
 function Frame({ children }: { children: React.ReactNode }) {
-  return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/">New research</Link><Link to="/history">Saved research</Link></nav><main>{children}</main><footer>Saved research, not current investment advice.</footer></div>;
+  return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/">New research</Link><Link to="/history">Saved research</Link><Link to="/watchlists">Watchlists</Link></nav><main>{children}</main><footer>Saved research, not current investment advice.</footer></div>;
 }
 
 export function HistoryPage() {

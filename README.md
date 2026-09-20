@@ -96,6 +96,10 @@ the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
 
 ## Usage
 
+The React **Watchlists** page saves multiple lists with ticker notes and tags.
+Research status, retrieval ages, and upcoming earnings use saved data only;
+opening a list never starts provider requests. See [watchlists](docs/watchlists.md).
+
 For the React application, open **Saved research** to filter, name, archive, and
 reopen stored report versions without refreshing their data. See
 [saved research history](docs/history.md) for API details and legacy limitations.

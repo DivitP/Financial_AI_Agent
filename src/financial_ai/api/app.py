@@ -42,6 +42,8 @@ from financial_ai.retrieval.qa import ResearchQA, Question, AnswerRejected
 from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.storage.history import ResearchHistory
+from financial_ai.storage.watchlists import Watchlists
+from financial_ai.api.watchlists import watchlist_router
 from financial_ai.workflow.jobs import Job, LocalResearchJobRunner
 from financial_ai.workflow.kronos import KronosWorkflowNode
 
@@ -77,6 +79,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         redoc_url=None,
     )
     app.state.database = database
+    app.include_router(watchlist_router(Watchlists(database)))
     app.state.repository = repository
     app.state.runner = runner
     app.state.kronos = KronosWorkflowNode(repository, get_settings())

@@ -9,7 +9,7 @@ export interface ApiFailure extends Error { code?: string; correlationId?: strin
 export interface HistoryItem { id: string; ticker: string; status: RunStatus; requested_at: string; name: string | null; archived: boolean; report_count: number }
 export interface HistoryView { run: Omit<HistoryItem, "report_count">; versions: { version: number; as_of: string; created_at: string }[]; report: ResearchReport | null; snapshots: ResearchSnapshot[]; notice: string }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, { headers: { "Content-Type": "application/json", ...init?.headers }, ...init });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string }; correlation_id?: string } | null;

@@ -334,6 +334,20 @@ def _downgrade_0009(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE IF EXISTS run_history_metadata")
 
 
+def _upgrade_0010(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE watchlists (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL)""")
+    connection.execute("""CREATE TABLE watchlist_items (
+        watchlist_id TEXT NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
+        ticker TEXT NOT NULL, notes TEXT NOT NULL, tags_json TEXT NOT NULL,
+        PRIMARY KEY(watchlist_id, ticker))""")
+
+
+def _downgrade_0010(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE watchlist_items")
+    connection.execute("DROP TABLE watchlists")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -344,4 +358,5 @@ MIGRATIONS = (
     Migration(7, "research_qa_history", _upgrade_0007, _downgrade_0007),
     Migration(8, "model_run_quality_history", _upgrade_0008, _downgrade_0008),
     Migration(9, "saved_research_history", _upgrade_0009, _downgrade_0009),
+    Migration(10, "persistent_watchlists", _upgrade_0010, _downgrade_0010),
 )
