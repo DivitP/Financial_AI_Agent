@@ -29,7 +29,7 @@ export function SavedRunPage() {
   const change = useMutation({ mutationFn: (fields: { name?: string | null; archived?: boolean }) => researchApi.updateHistory(runId, fields), onSuccess: () => { client.invalidateQueries({ queryKey: ["saved-history", runId] }); client.invalidateQueries({ queryKey: ["history"] }); } });
   const data = saved.data;
   return <Frame>{saved.isLoading && <p role="status">Loading saved version…</p>}{saved.error && <p role="alert">{saved.error.message}</p>}{data && <>
-    <h1>{data.run.name || data.run.ticker}</h1><p>{data.run.ticker} · Requested {data.run.requested_at}</p><p role="status">{data.notice}</p>
+    <h1>{data.run.name || data.run.ticker}</h1><p>{data.run.ticker} · Requested {data.run.requested_at}</p><p role="status">{data.notice}</p><p><Link to={`/runs/${runId}/changes`}>Changes since last run</Link></p>
     <form onSubmit={e => { e.preventDefault(); change.mutate({ name: name ?? data.run.name }); }}><label>Run name<input maxLength={80} value={name ?? data.run.name ?? ""} onChange={e => setName(e.target.value)} /></label><button disabled={change.isPending}>Save name</button></form>
     <button className="secondary" disabled={change.isPending} onClick={() => change.mutate({ archived: !data.run.archived })}>{data.run.archived ? "Restore run" : "Archive run"}</button>{change.error && <p role="alert">{change.error.message}</p>}
     {data.report && <><label>Saved report version<select value={data.report.version} onChange={e => setParams({ version: e.target.value })}>{data.versions.map(v => <option key={v.version} value={v.version}>Version {v.version} · as of {v.as_of}</option>)}</select></label>

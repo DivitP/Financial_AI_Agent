@@ -6,11 +6,12 @@ import { ResearchChat } from "./ResearchChat";
 import { ForecastPage } from "./ForecastPanel";
 import { HistoryPage, SavedRunPage } from "./ResearchHistory";
 import { WatchlistsPage } from "./Watchlists";
+import { DeltaReport } from "./DeltaReport";
 
 const tickerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$/;
 
 export function App() {
-  return <Routes><Route path="/" element={<ResearchForm />} /><Route path="/watchlists" element={<WatchlistsPage />} /><Route path="/history" element={<HistoryPage />} /><Route path="/history/:runId" element={<SavedRunPage />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>;
+  return <Routes><Route path="/" element={<ResearchForm />} /><Route path="/watchlists" element={<WatchlistsPage />} /><Route path="/history" element={<HistoryPage />} /><Route path="/history/:runId" element={<SavedRunPage />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/changes" element={<DeltaReport />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes>;
 }
 
 function ResearchForm() {

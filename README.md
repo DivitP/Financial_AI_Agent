@@ -96,6 +96,10 @@ the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
 
 ## Usage
 
+Saved History includes **Changes since last run**, comparing eight research
+areas with old/new evidence links and explicit coverage gaps.
+See [saved-run comparisons](docs/delta.md).
+
 The React **Watchlists** page saves multiple lists with ticker notes and tags.
 Research status, retrieval ages, and upcoming earnings use saved data only;
 opening a list never starts provider requests. See [watchlists](docs/watchlists.md).

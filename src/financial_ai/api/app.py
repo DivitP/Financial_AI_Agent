@@ -42,6 +42,7 @@ from financial_ai.retrieval.qa import ResearchQA, Question, AnswerRejected
 from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.storage.history import ResearchHistory
+from financial_ai.analysis.delta import ResearchDelta
 from financial_ai.storage.watchlists import Watchlists
 from financial_ai.api.watchlists import watchlist_router
 from financial_ai.workflow.jobs import Job, LocalResearchJobRunner
@@ -68,6 +69,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     database.migrate_to_latest()
     repository = ResearchRepository(database)
     history = ResearchHistory(database)
+    delta = ResearchDelta(database)
     runner = LocalResearchJobRunner(database)
     logger = configure_logging()
 
@@ -203,6 +205,15 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
             asset_type=instrument.asset_type.value,
             correlation_id=request.state.correlation_id,
         )
+
+    @app.get("/api/v1/research-runs/{run_id}/delta", tags=["history"])
+    def changes_since_last_run(run_id: UUID, previous_run_id: UUID | None = None):
+        try:
+            return delta.compare(run_id, previous_run_id)
+        except KeyError:
+            raise ApiError("run_not_found", "Research run not found.", 404) from None
+        except ValueError as exc:
+            raise ApiError("invalid_comparison", str(exc), 409) from None
 
     @app.get("/api/v1/research-runs", response_model=list[HistoryItem], tags=["history"])
     def list_history(
