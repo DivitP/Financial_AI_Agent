@@ -59,7 +59,8 @@ class ResearchComparison:
         self.database = database
 
     def compare(self, tickers):
-        columns, rows = [], {}
+        columns: list[dict] = []
+        rows: dict[str, dict[str, dict]] = {}
         with closing(self.database.connect()) as db:
             for ticker in tickers:
                 instruments = db.execute(
