@@ -96,6 +96,9 @@ the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
 
 ## Usage
 
+**Portfolio context** analyzes hypothetical weights and a candidate allocation
+using saved data only. See [portfolio assumptions and limits](docs/portfolio-context.md).
+
 Saved History includes **Changes since last run**, comparing eight research
 areas with old/new evidence links and explicit coverage gaps.
 See [saved-run comparisons](docs/delta.md).

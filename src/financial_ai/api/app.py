@@ -43,6 +43,7 @@ from financial_ai.storage.database import Database
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.storage.history import ResearchHistory
 from financial_ai.api.compare import comparison_router
+from financial_ai.api.portfolio import portfolio_router
 from financial_ai.analysis.delta import ResearchDelta
 from financial_ai.storage.watchlists import Watchlists
 from financial_ai.api.watchlists import watchlist_router
@@ -83,6 +84,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     )
     app.state.database = database
     app.include_router(comparison_router(database))
+    app.include_router(portfolio_router(database))
     app.include_router(watchlist_router(Watchlists(database)))
     app.state.repository = repository
     app.state.runner = runner
