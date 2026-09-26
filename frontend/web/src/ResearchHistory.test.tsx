@@ -33,9 +33,11 @@ it("reopens pinned versions, names and archives without calling live endpoints",
   });
   renderPage("/history/old?version=1");
   expect(await screen.findByText("Original as-of: 2025-01-01")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Export PDF" })).toHaveAttribute("href", "/api/v1/research-runs/old/export?version=1&format=pdf");
   expect(screen.getByRole("link", { name: "e1" })).toHaveAttribute("href", "https://www.sec.gov/Archives/original");
   fireEvent.change(screen.getByLabelText("Saved report version"), { target: { value: "2" } });
   expect(await screen.findByText("Original as-of: 2026-01-01")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Export JSON" })).toHaveAttribute("href", "/api/v1/research-runs/old/export?version=2&format=json");
   fireEvent.change(screen.getByLabelText("Run name"), { target: { value: "My thesis" } });
   fireEvent.click(screen.getByRole("button", { name: "Save name" }));
   await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/v1/research-runs/old/history", expect.objectContaining({ method: "PATCH", body: '{"name":"My thesis"}' })));

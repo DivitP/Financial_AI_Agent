@@ -96,6 +96,9 @@ the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
 
 ## Usage
 
+Saved report versions can be downloaded as **Markdown, JSON or PDF**, including
+their evidence appendix, metadata and captured charts. See [exports](docs/exports.md).
+
 **Calendar** aggregates cited events from saved watchlist research with source
 dates, timezone offsets, and date-confidence labels. See [calendar](docs/calendar.md).
 
