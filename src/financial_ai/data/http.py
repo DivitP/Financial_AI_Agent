@@ -65,15 +65,35 @@ class SharedHttpClient:
         self._inflight: dict[str, Future[HttpResponse]] = {}
         self._semaphores: dict[str, threading.BoundedSemaphore] = {}
         self._lock = threading.Lock()
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+    def health_summary(self) -> dict:
+        """Return aggregate counters only; never cache keys, URLs, headers or bodies."""
+        with self._lock:
+            now = self.monotonic()
+            return {
+                "state": "observed",
+                "scope": "attached in-process HTTP client",
+                "entries": len(self._cache),
+                "active_entries": sum(expires > now for expires, _ in self._cache.values()),
+                "expired_entries": sum(expires <= now for expires, _ in self._cache.values()),
+                "inflight": len(self._inflight),
+                "hits": self._cache_hits,
+                "misses": self._cache_misses,
+                "ttl_seconds": self.cache_ttl_seconds,
+            }
 
     def fetch(self, request: HttpRequest) -> HttpResponse:
         key = self._cache_key(request)
         with self._lock:
             cached = self._cache.get(key)
             if cached and cached[0] > self.monotonic():
+                self._cache_hits += 1
                 return cached[1]
             future = self._inflight.get(key)
             if future is None:
+                self._cache_misses += 1
                 future = Future()
                 self._inflight[key] = future
                 owner = True
@@ -108,7 +128,9 @@ class SharedHttpClient:
                 )
                 response = self.transport(enriched, self.timeout_seconds, self.max_response_bytes)
                 if len(response.body) > self.max_response_bytes:
-                    raise HttpResponseTooLargeError("provider response exceeded configured size limit")
+                    raise HttpResponseTooLargeError(
+                        "provider response exceeded configured size limit"
+                    )
                 if response.status_code != 429 and response.status_code < 500:
                     return response
                 if attempt == self.max_retries:
@@ -118,7 +140,9 @@ class SharedHttpClient:
 
     def _semaphore(self, provider: str) -> threading.BoundedSemaphore:
         with self._lock:
-            return self._semaphores.setdefault(provider, threading.BoundedSemaphore(self.provider_concurrency))
+            return self._semaphores.setdefault(
+                provider, threading.BoundedSemaphore(self.provider_concurrency)
+            )
 
     @staticmethod
     def _cache_key(request: HttpRequest) -> str:

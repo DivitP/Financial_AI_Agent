@@ -46,6 +46,7 @@ from financial_ai.api.compare import comparison_router
 from financial_ai.api.portfolio import portfolio_router
 from financial_ai.api.calendar import calendar_router
 from financial_ai.api.exports import export_router
+from financial_ai.api.console import console_router
 from financial_ai.analysis.delta import ResearchDelta
 from financial_ai.storage.watchlists import Watchlists
 from financial_ai.api.watchlists import watchlist_router
@@ -59,7 +60,10 @@ APP_VERSION = "0.1.0"
 
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        request.state.correlation_id = request.headers.get("X-Correlation-ID") or str(uuid4())
+        try:
+            request.state.correlation_id = str(UUID(request.headers.get("X-Correlation-ID", "")))
+        except ValueError:
+            request.state.correlation_id = str(uuid4())
         response = await call_next(request)
         response.headers["X-Correlation-ID"] = request.state.correlation_id
         return response
@@ -85,6 +89,7 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         redoc_url=None,
     )
     app.state.database = database
+    app.include_router(console_router(database, get_settings()))
     app.include_router(comparison_router(database))
     app.include_router(portfolio_router(database))
     app.include_router(calendar_router(database))

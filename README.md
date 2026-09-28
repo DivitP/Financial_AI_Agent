@@ -96,6 +96,9 @@ the FastAPI server on port 8000. Run `npm run test`, `npm run lint`, and
 
 ## Usage
 
+**Settings** shows read-only provider, model and cache diagnostics without
+credentials or live probes. See [settings console](docs/settings-console.md).
+
 Saved report versions can be downloaded as **Markdown, JSON or PDF**, including
 their evidence appendix, metadata and captured charts. See [exports](docs/exports.md).
 
