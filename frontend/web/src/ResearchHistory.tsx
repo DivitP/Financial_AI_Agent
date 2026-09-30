@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./security";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -35,7 +36,7 @@ export function SavedRunPage() {
     {data.report && <><label>Saved report version<select value={data.report.version} onChange={e => setParams({ version: e.target.value })}>{data.versions.map(v => <option key={v.version} value={v.version}>Version {v.version} · as of {v.as_of}</option>)}</select></label>
       <nav aria-label="Export saved report">{["md", "json", "pdf"].map(format => <a key={format} href={`/api/v1/research-runs/${runId}/export?version=${data.report!.version}&format=${format}`} download>Export {format.toUpperCase()}</a>)}</nav>
       <section className="card"><h2>Decision brief</h2><p>Original as-of: {data.report.as_of}</p><ul>{data.report.decision_brief.map((text, i) => <li key={i}>{text}</li>)}</ul>
-        {data.report.sections.map((section, i) => <section key={i}><h3>{section.title}</h3>{section.findings.map((finding, j) => <article key={j}><p>{finding.summary}</p>{finding.limitations?.map((text, k) => <p key={k}>Limitation: {text}</p>)}<ul>{finding.evidence_ids.map(id => { const url = data.report!.evidence_links[id]; return <li key={id}>{/^https?:\/\//i.test(url ?? "") ? <a href={url} target="_blank" rel="noreferrer">{id}</a> : <span>{id} — source link unavailable</span>}</li>; })}</ul></article>)}</section>)}
+        {data.report.sections.map((section, i) => <section key={i}><h3>{section.title}</h3>{section.findings.map((finding, j) => <article key={j}><p>{finding.summary}</p>{finding.limitations?.map((text, k) => <p key={k}>Limitation: {text}</p>)}<ul>{finding.evidence_ids.map(id => { const url = data.report!.evidence_links[id]; return <li key={id}>{/^https?:\/\//i.test(url ?? "") ? <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer">{id}</a> : <span>{id} — source link unavailable</span>}</li>; })}</ul></article>)}</section>)}
       </section><p>Source links are the saved URLs; external pages may have changed. Forecast research is not included in this historical snapshot view.</p>
       <details><summary>Full saved report and model configuration</summary><pre>{JSON.stringify(data.report, null, 2)}</pre></details></>}
     {data.snapshots.map(snapshot => <details className="card" key={snapshot.lane}><summary>{snapshot.lane} · {snapshot.status} · saved at report creation</summary><pre>{JSON.stringify(snapshot, null, 2)}</pre></details>)}

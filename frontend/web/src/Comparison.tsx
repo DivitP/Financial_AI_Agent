@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./security";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -8,7 +9,7 @@ interface Cell { normalized_value: number | null; normalized_unit: string | null
 interface Result { notice: string; columns: { ticker: string; asset_type?: string; currency?: string; run_id: string | null; as_of?: string | null; limitations: string[]; sections: Record<string, { data: unknown; evidence: Citation[]; comparison: string }> }[];
   metrics: { metric: string; comparable: boolean; reasons: string[]; cells: Record<string, Cell> }[] }
 function Sources({ citations }: { citations: Citation[] }) {
-  return citations.length ? <ul>{citations.map(c => <li key={c.id}><a href={c.exact_url} target="_blank" rel="noreferrer">{c.id}</a> · {c.provider} · {c.retrieved_at}</li>)}</ul> : <p>Unverified: exact evidence unavailable.</p>;
+  return citations.length ? <ul>{citations.map(c => <li key={c.id}><a href={safeExternalUrl(c.exact_url)} target="_blank" rel="noopener noreferrer">{c.id}</a> · {c.provider} · {c.retrieved_at}</li>)}</ul> : <p>Unverified: exact evidence unavailable.</p>;
 }
 export function ComparisonPage() {
   const [symbols, setSymbols] = useState("");
@@ -24,7 +25,7 @@ export function ComparisonPage() {
       {["decision", "quality"].map(lane => <section key={lane}><h3>{lane === "decision" ? "Scenarios and risks" : "Data quality"}</h3>{column.sections[lane] ? <><p>{column.sections[lane].comparison}</p><Sources citations={column.sections[lane].evidence} /><pre>{JSON.stringify(column.sections[lane].data, null, 2)}</pre></> : <p>Unavailable in saved data.</p>}</section>)}
     </section>)}</div><h2>Normalized metrics and valuation</h2>
       {!result.metrics.length && <p>No structured metrics available for comparison.</p>}
-      {result.metrics.map(row => <section className="card" key={row.metric}><h3>{row.metric}</h3><p>{row.comparable ? "Comparable on recorded metadata" : "Incomparable"}</p><ul>{row.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><div style={{ overflowX: "auto" }}><table><caption>{row.metric} by ticker</caption><thead><tr>{result.columns.map(c => <th scope="col" key={c.ticker}>{c.ticker}</th>)}</tr></thead><tbody><tr>{result.columns.map(c => { const cell = row.cells[c.ticker]; return <td key={c.ticker}>{cell ? <><p>{cell.normalized_value ?? "Unavailable"} {cell.normalized_unit ?? ""}</p><Sources citations={cell.evidence} /><details><summary>Original value, units and fiscal metadata</summary><pre>{JSON.stringify(cell, null, 2)}</pre></details></> : "Unavailable / not applicable"}</td>; })}</tr></tbody></table></div></section>)}
+      {result.metrics.map(row => <section className="card" key={row.metric}><h3>{row.metric}</h3><p>{row.comparable ? "Comparable on recorded metadata" : "Incomparable"}</p><ul>{row.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul><div className="table-scroll"><table><caption>{row.metric} by ticker</caption><thead><tr>{result.columns.map(c => <th scope="col" key={c.ticker}>{c.ticker}</th>)}</tr></thead><tbody><tr>{result.columns.map(c => { const cell = row.cells[c.ticker]; return <td key={c.ticker}>{cell ? <><p>{cell.normalized_value ?? "Unavailable"} {cell.normalized_unit ?? ""}</p><Sources citations={cell.evidence} /><details><summary>Original value, units and fiscal metadata</summary><pre>{JSON.stringify(cell, null, 2)}</pre></details></> : "Unavailable / not applicable"}</td>; })}</tr></tbody></table></div></section>)}
     </>}
   </main></div>;
 }

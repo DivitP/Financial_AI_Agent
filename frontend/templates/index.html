@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Financial AI Research</title><link rel="stylesheet" href="/static/legacy.css">
+<script src="/static/legacy.js" defer></script></head>
+<body data-task-id="{{ task_id or '' }}"><main>
+<h1>Financial AI Research</h1><p>Research only. Forecasts are experimental, not investment advice.</p>
+<form method="post" action="/run"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<label>Ticker <input name="ticker" value="{{ ticker or '' }}" required maxlength="20"></label>
+<button>Generate report</button></form>
+{% if report %}<section><h2>Fundamental Analysis Report</h2>
+<div>{{ text_report_html | safe }}</div>
+{% if task_id %}<p id="statusBar" role="status">Analysis running</p><div id="chartsContainer"></div>{% endif %}
+</section>{% endif %}
+<section><h2>Ask follow-up</h2><form id="askForm" action="/ask" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<input id="tickerHidden" type="hidden" name="ticker" value="{{ ticker or '' }}">
+<label>Your question<textarea id="questionInput" name="question" required></textarea></label><button>Ask</button></form>
+<div id="answerContainer" role="status"></div></section>
+{% if answer %}<pre>{{ answer }}</pre>{% for source in sources or [] %}
+{% if safe_link(source) %}<a href="{{ safe_link(source) }}" rel="noopener noreferrer" target="_blank">{{ source }}</a>{% endif %}
+{% endfor %}{% endif %}</main></body></html>

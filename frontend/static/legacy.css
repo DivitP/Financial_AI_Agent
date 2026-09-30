@@ -1,0 +1,7 @@
+body { font: 1rem system-ui; margin: 2rem; line-height: 1.6; }
+main { max-width: 70rem; margin: auto; }
+section { border: 1px solid #aaa; border-radius: .5rem; padding: 1rem; margin-top: 1rem; }
+textarea { display: block; width: 95%; min-height: 6rem; }
+button, input { padding: .5rem; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+img { max-width: 100%; }

@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./security";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { request } from "./api";
@@ -6,7 +7,7 @@ interface Citation { id: string; exact_url: string; provider: string; retrieved_
 interface Delta { current_run_id: string; previous_run_id: string | null; basis: Record<string, unknown>; limitations: string[]; unchanged: string[];
   changes: { lane: string; old: unknown; new: unknown; old_evidence: Citation[]; new_evidence: Citation[] }[] }
 function Sources({ links }: { links: Citation[] }) {
-  return <ul>{links.map(link => <li key={link.id}><a href={link.exact_url} target="_blank" rel="noreferrer">{link.id}</a> · {link.provider} · retrieved {link.retrieved_at}</li>)}</ul>;
+  return <ul>{links.map(link => <li key={link.id}><a href={safeExternalUrl(link.exact_url)} target="_blank" rel="noopener noreferrer">{link.id}</a> · {link.provider} · retrieved {link.retrieved_at}</li>)}</ul>;
 }
 export function DeltaReport() {
   const { runId = "" } = useParams();

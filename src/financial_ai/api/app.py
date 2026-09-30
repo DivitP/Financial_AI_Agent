@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from settings import get_settings
+from financial_ai.security import SecurityBoundary
 
 from financial_ai.api.errors import (
     ApiError,
@@ -85,10 +86,28 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         title="Financial AI Research API",
         version=APP_VERSION,
         openapi_url="/openapi.json",
-        docs_url="/docs",
+        docs_url=None,
         redoc_url=None,
     )
     app.state.database = database
+
+    @app.get("/docs", include_in_schema=False)
+    def api_docs():
+        from secrets import token_urlsafe
+        from fastapi.openapi.docs import get_swagger_ui_html
+        from financial_ai.security import CSP
+
+        nonce = token_urlsafe(24)
+        response = get_swagger_ui_html(openapi_url="/openapi.json", title="Research API")
+        response.body = (
+            response.body.decode().replace("<script", f'<script nonce="{nonce}"').encode()
+        )
+        response.headers["content-length"] = str(len(response.body))
+        response.headers["Content-Security-Policy"] = CSP.replace(
+            "script-src 'self'", f"script-src 'self' https://cdn.jsdelivr.net 'nonce-{nonce}'"
+        ).replace("style-src 'self'", "style-src 'self' https://cdn.jsdelivr.net")
+        return response
+
     app.include_router(console_router(database, get_settings()))
     app.include_router(comparison_router(database))
     app.include_router(portfolio_router(database))
@@ -103,6 +122,11 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         create_chat_provider(get_settings()),
     )
     app.add_middleware(CorrelationIdMiddleware)
+    app.add_middleware(
+        SecurityBoundary,
+        origins=get_settings().allowed_browser_origins,
+        hosts=get_settings().allowed_hosts,
+    )
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(Exception, unexpected_error_handler)
     from fastapi.exceptions import RequestValidationError

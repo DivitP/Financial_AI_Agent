@@ -5,6 +5,7 @@ description = "Evidence-first financial research application (legacy Flask basel
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
+    "bleach>=6.2,<7",
     "arch>=7.2,<9",
     "duckduckgo-search>=6.3,<8",
     "flask>=3.0,<4",

@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./security";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -26,7 +27,7 @@ export function PortfolioPage() {
     {analysis.data && <><h2>Assumptions and limitations</h2><ul>{analysis.data.limitations.map(text => <li key={text}>{text}</li>)}</ul>
       <div className="form-grid">{(["before", "after"] as const).map(side => { const data = analysis.data![side]; return <section className="card" key={side}><h2>{side === "before" ? "Before candidate" : "With candidate"}</h2><p>Largest ticker weight: {(data.largest_weight * 100).toFixed(2)}% · HHI: {data.hhi.toFixed(4)}</p><h3>Weights and sector exposure</h3><pre>{JSON.stringify({ weights: data.weights, sectors: data.sector_weights }, null, 2)}</pre><p>Weights are fractions; 0.39 means 39%. Unknown exposure is not zero.</p><h3>Factor exposure</h3><p>{data.factor_note}</p>{Object.keys(data.factor_loadings).length ? <pre>{JSON.stringify(data.factor_loadings, null, 2)}</pre> : <p>Factor exposure unavailable.</p>}</section>; })}</div>
       <section className="card"><h2>Historical correlations and risk change</h2>{analysis.data.historical_risk.available ? <><p>Volatility and drawdown are fractions. Negative drawdown is loss from a prior peak. Null correlation means undefined.</p><pre>{JSON.stringify(analysis.data.historical_risk, null, 2)}</pre></> : <p>Unavailable: {analysis.data.historical_risk.reason}</p>}</section>
-      <h2>Saved sources and freshness</h2>{Object.entries(analysis.data.sources).map(([ticker, source]) => <section key={ticker}><h3>{ticker}</h3>{source.run_id && <Link to={`/history/${source.run_id}`}>Open saved run</Link>}<p>{source.limitation}</p>{Object.entries(source.lanes).map(([lane, meta]) => <div key={lane}><p>{lane} · {meta.provider ?? "unknown provider"} · retrieved {meta.retrieved_at ?? "unknown"}</p>{meta.evidence.length ? meta.evidence.map(e => <p key={e.id}><a href={e.exact_url} target="_blank" rel="noreferrer">{e.id}</a></p>) : <p>Uncited data excluded.</p>}</div>)}</section>)}
+      <h2>Saved sources and freshness</h2>{Object.entries(analysis.data.sources).map(([ticker, source]) => <section key={ticker}><h3>{ticker}</h3>{source.run_id && <Link to={`/history/${source.run_id}`}>Open saved run</Link>}<p>{source.limitation}</p>{Object.entries(source.lanes).map(([lane, meta]) => <div key={lane}><p>{lane} · {meta.provider ?? "unknown provider"} · retrieved {meta.retrieved_at ?? "unknown"}</p>{meta.evidence.length ? meta.evidence.map(e => <p key={e.id}><a href={safeExternalUrl(e.exact_url)} target="_blank" rel="noopener noreferrer">{e.id}</a></p>) : <p>Uncited data excluded.</p>}</div>)}</section>)}
     </>}
   </main></div>;
 }

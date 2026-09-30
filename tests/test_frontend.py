@@ -29,7 +29,9 @@ def test_run_route_starts_technical_work_after_mocked_report(import_frontend, mo
     monkeypatch.setattr(
         frontend,
         "run_research_and_fundamental_agents",
-        lambda _ticker, _path: {"report_md": "## Research\nOffline report"},
+        lambda _ticker, _path: {
+            "report_md": '## Research\nOffline report\n<img src=x onerror="alert(1)"><script>alert(1)</script>'
+        },
     )
 
     class FakeThread:
@@ -44,8 +46,14 @@ def test_run_route_starts_technical_work_after_mocked_report(import_frontend, mo
 
     monkeypatch.setattr(frontend.threading, "Thread", FakeThread)
 
-    response = frontend.app.test_client().post("/run", data={"ticker": "aapl"})
+    client = frontend.app.test_client()
+    client.get("/")
+    with client.session_transaction() as session:
+        token = session["csrf_token"]
+    response = client.post("/run", data={"ticker": "aapl", "csrf_token": token})
 
     assert response.status_code == 200
     assert b"Offline report" in response.data
     assert b"AAPL" in response.data
+    assert b"onerror" not in response.data
+    assert b"<script>alert" not in response.data

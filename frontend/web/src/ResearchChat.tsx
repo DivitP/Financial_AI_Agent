@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./security";
 import { FormEvent, useEffect, useState } from "react";
 
 type Citation = { url: string; evidence_id: string; section: string; excerpt: string; published_at: string };
@@ -24,7 +25,7 @@ export function ResearchChat({ runId }: { runId: string }) {
     setPending(true); setPartial([]); setError("");
     try {
       const response = await fetch(`/api/v1/research-runs/${runId}/qa`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question }),
+        method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "FinancialAI" }, body: JSON.stringify({ question }),
       });
       if (!response.ok || !response.body) throw Error("The answer could not be verified or the service is unavailable.");
       const reader = response.body.getReader(); const decoder = new TextDecoder();
@@ -69,6 +70,6 @@ function CitedClaim({ claim }: { claim: Claim }) {
   return <div><blockquote>{claim.text}</blockquote><span onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
     <button className="secondary" aria-expanded={open} onFocus={() => setOpen(true)} onClick={() => setOpen(!open)}>Source: {source.section}</button>
     {open && <aside><p>{source.excerpt}</p><small>{source.published_at} · {source.evidence_id}</small><p>
-      {/^https?:\/\//i.test(source.url) && <a href={source.url} target="_blank" rel="noopener noreferrer">Open exact source</a>}</p></aside>}
+      {/^https?:\/\//i.test(source.url) && <a href={safeExternalUrl(source.url)} target="_blank" rel="noopener noreferrer">Open exact source</a>}</p></aside>}
   </span></div>;
 }

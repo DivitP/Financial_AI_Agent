@@ -33,6 +33,20 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", validation_alias="FINANCIAL_AI_HOST")
     port: int = Field(default=8501, ge=1, le=65535, validation_alias="PORT")
     debug: bool = Field(default=False, validation_alias="FINANCIAL_AI_DEBUG")
+    allowed_browser_origins: list[str] = Field(
+        default=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://localhost:8501",
+            "http://127.0.0.1:8501",
+        ],
+        validation_alias="ALLOWED_BROWSER_ORIGINS",
+    )
+    allowed_hosts: list[str] = Field(
+        default=["localhost", "127.0.0.1", "testserver"], validation_alias="ALLOWED_HOSTS"
+    )
 
     persist_dir: Path = Field(
         default=Path("data/runtime"),
@@ -112,8 +126,24 @@ class Settings(BaseSettings):
             raise ValueError("Enable only one chat provider: ENABLE_GROQ or ENABLE_LOCAL_LLM.")
         if not self.local_llm_base_url.startswith(("http://", "https://")):
             raise ValueError("LOCAL_LLM_BASE_URL must be an http(s) URL.")
-        if self.app_environment == "production" and self.debug:
-            raise ValueError("FINANCIAL_AI_DEBUG must be false in production.")
+        if self.debug:
+            raise ValueError("FINANCIAL_AI_DEBUG must be false in all environments.")
+        from urllib.parse import urlsplit
+
+        for origin in self.allowed_browser_origins:
+            parsed = urlsplit(origin)
+            if (
+                parsed.scheme not in ("http", "https")
+                or not parsed.hostname
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+                or parsed.username
+                or "*" in origin
+            ):
+                raise ValueError("ALLOWED_BROWSER_ORIGINS requires exact http(s) origins.")
+        if any("*" in host or "/" in host for host in self.allowed_hosts):
+            raise ValueError("ALLOWED_HOSTS requires explicit hostnames, not wildcards.")
         return self
 
 

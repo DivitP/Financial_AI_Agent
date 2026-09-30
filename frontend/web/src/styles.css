@@ -18,3 +18,4 @@
 .forecast-table th, .forecast-table td { padding: .7rem; border-bottom: 1px solid var(--forecast-border); text-align: left; }
 .forecast-table caption { text-align: left; font-weight: 600; padding: .5rem; }
 .forecast-page summary { cursor: pointer; padding: .6rem 0; }
+.table-scroll { overflow-x: auto; }

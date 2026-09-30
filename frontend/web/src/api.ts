@@ -10,7 +10,10 @@ export interface HistoryItem { id: string; ticker: string; status: RunStatus; re
 export interface HistoryView { run: Omit<HistoryItem, "report_count">; versions: { version: number; as_of: string; created_at: string }[]; report: ResearchReport | null; snapshots: ResearchSnapshot[]; notice: string }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, { headers: { "Content-Type": "application/json", ...init?.headers }, ...init });
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("X-Requested-With", "FinancialAI");
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { error?: { code?: string; message?: string }; correlation_id?: string } | null;
     const error = new Error(body?.error?.message ?? "The research service is unavailable.") as ApiFailure;

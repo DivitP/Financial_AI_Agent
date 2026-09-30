@@ -24,8 +24,9 @@ def test_enabled_fmp_requires_a_key() -> None:
         Settings(ENABLE_FMP=True, _env_file=None)  # type: ignore[call-arg]
 
 
-def test_production_rejects_debug_mode() -> None:
-    with pytest.raises(ValidationError, match="must be false in production"):
+@pytest.mark.parametrize("environment", ["production", "development", "test"])
+def test_debug_is_disabled(environment) -> None:
+    with pytest.raises(ValidationError, match="must be false"):
         Settings(  # type: ignore[call-arg]
-            APP_ENVIRONMENT="production", FINANCIAL_AI_DEBUG=True, _env_file=None
+            APP_ENVIRONMENT=environment, FINANCIAL_AI_DEBUG=True, _env_file=None
         )

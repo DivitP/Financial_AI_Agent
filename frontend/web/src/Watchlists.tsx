@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "./security";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -49,7 +50,7 @@ function WatchlistDetail({ id, onDeleted }: { id: string; onDeleted: () => void 
       {item.latest_run ? <p>Latest research: {item.latest_run.status} · {item.latest_run.requested_at} · <Link to={`/history/${item.latest_run.id}`}>Open saved {item.ticker} research</Link></p> : <p>No saved research. Symbol has not been resolved.</p>}
       <h4>Data freshness</h4>{item.freshness.length ? <ul>{item.freshness.map(f => <li key={f.lane}>{f.lane}: {f.status}, {f.state} · retrieved {f.retrieved_at ?? "unknown"}</li>)}</ul> : <p>Freshness unknown — no saved observations.</p>}
       <h4>Upcoming events</h4>{item.upcoming_events.length ? <ul>{item.upcoming_events.map((event, i) => <li key={i}>{event.kind}: {event.scheduled_at} · {event.release_session} · retrieved {event.retrieved_at ?? "unknown"} · {event.evidence_ids.length ? "Evidence: " + event.evidence_ids.join(", ") : "Evidence unavailable"}
-        {event.source_url && /^https?:\/\//i.test(event.source_url) && <> · <a href={event.source_url} target="_blank" rel="noreferrer">Saved source</a></>}</li>)}</ul> : <p>No upcoming events in saved data; coverage may be incomplete.</p>}
+        {event.source_url && /^https?:\/\//i.test(event.source_url) && <> · <a href={safeExternalUrl(event.source_url)} target="_blank" rel="noopener noreferrer">Saved source</a></>}</li>)}</ul> : <p>No upcoming events in saved data; coverage may be incomplete.</p>}
     </article>)}
   </section>;
 }
