@@ -9,7 +9,8 @@ from langchain.tools import Tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.tools import DuckDuckGoSearchRun
-from newspaper import Article
+from financial_ai.data.documents import document_envelope, UNTRUSTED_POLICY
+from financial_ai.data.http import SharedHttpClient, HttpRequest
 from settings import get_settings
 
 load_dotenv()
@@ -31,7 +32,7 @@ def search_web(query: str) -> str:
     """Search the web using DuckDuckGo for general queries and recent news."""
     try:
         search_tool = DuckDuckGoSearchRun()
-        return search_tool.run(query)
+        return document_envelope(search_tool.run(query))
     except Exception as e:
         return f"Error performing search: {e}"
 
@@ -39,12 +40,12 @@ def search_web(query: str) -> str:
 def get_webpage_content(url: str) -> str:
     """A tool to get the full text content from a specific webpage URL."""
     try:
-        article = Article(url)
-        article.download()
-        article.parse()
-        return article.text
-    except Exception as e:
-        return f"Error fetching article from {url}: {e}"
+        response = SharedHttpClient().fetch(HttpRequest("article", url))
+        if response.status_code != 200:
+            return "Document unavailable."
+        return document_envelope(response.body.decode("utf-8", errors="replace"))
+    except Exception:
+        return "Document blocked or unavailable. Check the approved document hosts."
 
 tools = [search_web, get_webpage_content]
 
@@ -88,7 +89,7 @@ system_message = dedent("""\
 
 prompt = ChatPromptTemplate.from_messages(
     [
-        ("system", system_message),
+        ("system", system_message + "\n" + UNTRUSTED_POLICY),
         ("user", "{input}"),
         MessagesPlaceholder(variable_name="agent_scratchpad"),
     ]

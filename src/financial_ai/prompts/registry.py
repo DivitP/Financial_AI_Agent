@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from financial_ai.llm.contracts import ChatMessage, ChatProvider
+from financial_ai.data.documents import UNTRUSTED_POLICY, document_envelope
 
 
 class PromptDefinition(BaseModel):
@@ -57,13 +58,15 @@ class PromptRegistry:
 
     def render(self, definition: PromptDefinition, values: Mapping[str, str]) -> list[ChatMessage]:
         try:
-            user_content = definition.user_template.format_map(values)
+            user_content = definition.user_template.format_map(
+                {key: document_envelope(value) for key, value in values.items()}
+            )
         except KeyError as error:
             raise ValueError(
                 f"Prompt '{definition.id}' is missing variable {error.args[0]!r}."
             ) from error
         return [
-            ChatMessage(role="system", content=definition.system),
+            ChatMessage(role="system", content=definition.system + "\n" + UNTRUSTED_POLICY),
             ChatMessage(role="user", content=user_content),
         ]
 

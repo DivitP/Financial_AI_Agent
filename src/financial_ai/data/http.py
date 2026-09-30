@@ -41,7 +41,7 @@ class SharedHttpClient:
 
     def __init__(
         self,
-        transport: Transport,
+        transport: Transport | None = None,
         *,
         timeout_seconds: float = 15.0,
         cache_ttl_seconds: float = 300.0,
@@ -52,6 +52,11 @@ class SharedHttpClient:
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
+        if transport is None:
+            from settings import get_settings
+            from financial_ai.data.safe_transport import SafeTransport
+
+            transport = SafeTransport(get_settings().document_allowed_hosts)
         self.transport = transport
         self.timeout_seconds = timeout_seconds
         self.cache_ttl_seconds = cache_ttl_seconds

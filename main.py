@@ -383,6 +383,7 @@ def run_all_agents_and_store(ticker: str, persist_dir: str = "./chroma_db") -> D
 
 
 def answer_question_with_rag(vs: SimpleSQLiteVectorStore, ticker: str, question: str, k: int = 6) -> Dict[str, Any]:
+    from financial_ai.data.documents import document_envelope, UnsafeDocument, UNTRUSTED_POLICY
     contexts = retrieve_context(vs, ticker, question, k=k)
     context_blocks = []
     aggregated_sources: List[str] = []
@@ -392,14 +393,17 @@ def answer_question_with_rag(vs: SimpleSQLiteVectorStore, ticker: str, question:
         aggregated_sources.extend(srcs)
         snippet = c.get("content", "")
         agent = meta.get("agent", "unknown")
-        context_blocks.append(f"[Agent={agent}]\n{snippet}")
+        try:
+            context_blocks.append(document_envelope(f"[Agent={agent}]\n{snippet}"))
+        except UnsafeDocument:
+            continue
 
     system = (
         "You are a financial analysis assistant. Answer the user's question strictly using the provided context excerpts. "
         "Cite evidence inline by noting the agent name in parentheses, e.g., (fundamental) or (research). If the answer is not supported by the context, say you don't have enough information."
     )
     prompt = ChatPromptTemplate.from_messages([
-        ("system", system),
+        ("system", system + "\n" + UNTRUSTED_POLICY),
         ("human", "Ticker: {ticker}\nQuestion: {question}\n\nContext:\n{context}\n\nAnswer concisely and include citations."),
     ])
 

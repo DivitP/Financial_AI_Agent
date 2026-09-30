@@ -48,6 +48,11 @@ class Settings(BaseSettings):
         default=["localhost", "127.0.0.1", "testserver"], validation_alias="ALLOWED_HOSTS"
     )
 
+    document_allowed_hosts: list[str] = Field(
+        default=["www.sec.gov", "data.sec.gov", "api.gdeltproject.org"],
+        validation_alias="DOCUMENT_ALLOWED_HOSTS",
+    )
+
     persist_dir: Path = Field(
         default=Path("data/runtime"),
         validation_alias=AliasChoices("FINANCIAL_AI_PERSIST_DIR", "PERSIST_DIR"),

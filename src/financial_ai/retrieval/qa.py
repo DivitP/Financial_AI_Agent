@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from financial_ai.llm.contracts import ChatMessage, ChatProvider
 from financial_ai.retrieval.index import ResearchIndex
+from financial_ai.data.documents import UnsafeDocument, document_text
 
 
 class Question(BaseModel):
@@ -63,6 +64,14 @@ class ResearchQA:
             and r["run_id"] == str(run_id)
             and urls.get(r["evidence_id"]) == r["source_url"]
         }
+        # Recheck old indexes and metadata too; rejected chunks never reach the model.
+        for key, record in list(context.items()):
+            try:
+                document_text(json.dumps(record, ensure_ascii=False))
+                context[key] = {**record, "text": document_text(record["text"])}
+            except UnsafeDocument:
+                del context[key]
+                warnings.append("Untrusted document quarantined; evidence coverage is reduced.")
         result: dict = {
             "status": "insufficient_evidence",
             "claims": [],

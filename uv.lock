@@ -894,6 +894,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "arch" },
+    { name = "beautifulsoup4" },
     { name = "bleach" },
     { name = "duckduckgo-search" },
     { name = "fastapi" },
@@ -964,6 +965,7 @@ dev = [
 requires-dist = [
     { name = "accelerate", marker = "extra == 'kronos'", specifier = ">=1.2,<2" },
     { name = "arch", specifier = ">=7.2,<9" },
+    { name = "beautifulsoup4", specifier = ">=4.12,<5" },
     { name = "bleach", specifier = ">=6.2,<7" },
     { name = "chromadb", marker = "extra == 'vector'", specifier = ">=1.0,<2" },
     { name = "duckduckgo-search", specifier = ">=6.3,<8" },

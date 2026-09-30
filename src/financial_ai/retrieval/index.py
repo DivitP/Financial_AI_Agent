@@ -15,6 +15,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, AwareDatetime
 
 from financial_ai.storage.database import Database
+from financial_ai.data.documents import document_text
 
 
 class SourceText(BaseModel):
@@ -46,6 +47,7 @@ def chunks(source: SourceText, max_chars: int = 1200) -> list[dict[str, str]]:
     if not 100 <= max_chars <= 4000:
         raise ValueError("max_chars must be between 100 and 4000")
     safe_text(source.text)
+    cleaned = document_text(source.text)
     safe_text(str(source.source_url))
     metadata = source.model_dump(mode="json", exclude={"text"})
     for value in metadata.values():
@@ -53,7 +55,7 @@ def chunks(source: SourceText, max_chars: int = 1200) -> list[dict[str, str]]:
     metadata["source_hash"] = hashlib.sha256(source.text.encode()).hexdigest()
     section = "Document"
     result = {}
-    for block in re.split(r"\n\s*\n|(?=^#{1,6} |^Item \d)", source.text, flags=re.M):
+    for block in re.split(r"\n\s*\n|(?=^#{1,6} |^Item \d)", cleaned, flags=re.M):
         block = block.strip()
         if not block:
             continue
