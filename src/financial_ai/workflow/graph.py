@@ -11,6 +11,7 @@ from uuid import UUID
 from langgraph.graph import END, START, StateGraph
 
 from financial_ai.storage.repositories import ResearchRepository
+from financial_ai.quotas import research_budget, current_quotas, QuotaExceeded
 
 
 GraphNode = Callable[[], Awaitable[dict[str, object]]]
@@ -76,6 +77,7 @@ class PersistentResearchGraph:
             for attempt in range(1, self.max_retries + 2):
                 self.repository.upsert_graph_checkpoint(run_id, name, "running", attempt)
                 try:
+                    current_quotas().charge("calls")
                     payload = await asyncio.wait_for(
                         self.nodes[name](), timeout=self.timeout_seconds
                     )
@@ -84,7 +86,7 @@ class PersistentResearchGraph:
                     self.repository.upsert_graph_checkpoint(
                         run_id, name, "failed", attempt, error_message=message
                     )
-                    if attempt <= self.max_retries:
+                    if attempt <= self.max_retries and not isinstance(error, QuotaExceeded):
                         continue
                     errors[name] = message
                     return {"outputs": outputs, "errors": errors, "completed_nodes": completed}
@@ -98,6 +100,7 @@ class PersistentResearchGraph:
 
         return run_node
 
+    @research_budget
     async def run(self, run_id: UUID) -> ResearchGraphState:
         """Resume from completed checkpoints and retain partial output on node failure."""
 

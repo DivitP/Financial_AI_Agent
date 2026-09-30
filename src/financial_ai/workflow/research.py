@@ -10,6 +10,7 @@ from typing import Any
 from uuid import UUID
 
 from financial_ai.storage.repositories import ResearchRepository
+from financial_ai.quotas import research_budget, current_quotas
 
 
 LaneCallable = Callable[[], Awaitable[dict[str, object]]]
@@ -38,6 +39,7 @@ class InitialResearchWorkflow:
         self.lanes = lanes
         self.kronos_node = kronos_node
 
+    @research_budget
     async def run(self, run_id: UUID) -> list[Snapshot]:
         run = self.repository.get_run(run_id)
         if run is None:
@@ -46,8 +48,13 @@ class InitialResearchWorkflow:
         optional_forecast = self.kronos_node is not None or options.get("include_kronos", False)
         self.repository.update_run_status(run_id, "running")
         lane_names = list(self.required_lanes)
+
+        async def lane_call(lane):
+            current_quotas().charge("calls")
+            return await self.lanes[lane]()
+
         results = await asyncio.gather(
-            *(self.lanes[lane]() for lane in lane_names), return_exceptions=True
+            *(lane_call(lane) for lane in lane_names), return_exceptions=True
         )
         snapshots: list[Snapshot] = []
         with self.repository.database.transaction() as connection:

@@ -101,7 +101,13 @@ def benchmark(tmp_path, monkeypatch):
             )
             index.index(source)
             rows[name] = chunks(source)[0]
-    return index, runs, rows
+    from financial_ai.quotas import Quotas
+    from settings import Settings
+
+    # Quality benchmarks deliberately make more calls than a normal research run.
+    limits = Settings(_env_file=None, run_model_budget=30)  # type: ignore[call-arg]
+    with Quotas(db, limits).context():
+        yield index, runs, rows
 
 
 @pytest.mark.parametrize("mode", ["lexical", "hybrid"])

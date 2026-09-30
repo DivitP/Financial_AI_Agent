@@ -71,6 +71,16 @@ class Settings(BaseSettings):
         default=30, ge=1, le=10_000, validation_alias="PROVIDER_RATE_LIMIT_PER_MINUTE"
     )
 
+    api_requests_per_minute: int = Field(default=120, ge=1, le=10000)
+    api_concurrency: int = Field(default=16, ge=1, le=100)
+    max_pending_jobs: int = Field(default=20, ge=1, le=1000)
+    max_running_jobs: int = Field(default=2, ge=1, le=20)
+    run_call_budget: int = Field(default=60, ge=1, le=1000)
+    run_article_budget: int = Field(default=20, ge=0, le=200)
+    run_model_budget: int = Field(default=8, ge=0, le=100)
+    provider_concurrency: int = Field(default=2, ge=1, le=20)
+    max_retry_delay_seconds: float = Field(default=10, ge=0, le=60)
+
     enable_groq: bool = Field(default=False, validation_alias="ENABLE_GROQ")
     enable_fmp: bool = Field(default=False, validation_alias="ENABLE_FMP")
     enable_kronos: bool = Field(default=False, validation_alias="ENABLE_KRONOS")

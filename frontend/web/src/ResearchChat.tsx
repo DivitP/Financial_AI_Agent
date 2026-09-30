@@ -27,7 +27,11 @@ export function ResearchChat({ runId }: { runId: string }) {
       const response = await fetch(`/api/v1/research-runs/${runId}/qa`, {
         method: "POST", headers: { "Content-Type": "application/json", "X-Requested-With": "FinancialAI" }, body: JSON.stringify({ question }),
       });
-      if (!response.ok || !response.body) throw Error("The answer could not be verified or the service is unavailable.");
+      if (!response.ok) {
+        const failure = await response.json().catch(() => null);
+        throw Error(failure?.error?.message ?? "The answer could not be verified or the service is unavailable.");
+      }
+      if (!response.body) throw Error("The answer stream is unavailable.");
       const reader = response.body.getReader(); const decoder = new TextDecoder();
       let buffer = ""; let complete = false;
       while (true) {

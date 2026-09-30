@@ -12,6 +12,7 @@ from financial_ai.kronos.preprocessing import Candle, CorporateAction, Session, 
 from financial_ai.kronos.quality import KronosQuality, PromotionPolicy, Scope, fingerprint
 from financial_ai.storage.model_runs import ModelRunRepository
 from financial_ai.workflow.jobs import LocalResearchJobRunner
+from financial_ai.quotas import Quotas, QuotaExceeded
 
 
 class KronosWorkflowNode:
@@ -186,9 +187,17 @@ class KronosWorkflowNode:
                 run_id, "kronos", "running", attempt, {"cache_key": key}
             )
             try:
-                record = await asyncio.to_thread(
-                    self.quality.forecast, self.provider, prepared, symbol=run["symbol"]
-                )
+                quotas = Quotas(self.repository.database, self.settings)
+
+                def forecast():
+                    with (
+                        quotas.context(run_id),
+                        quotas.slot("model:kronos", self.settings.provider_concurrency),
+                    ):
+                        quotas.charge("models")
+                        return self.quality.forecast(self.provider, prepared, symbol=run["symbol"])
+
+                record = await asyncio.to_thread(forecast)
                 if self.repository.get_run(run_id)["status"] == "cancelled":
                     return self._save(run_id, KronosResponse(status="cancelled", cache_key=key))
                 if record["status"] != "completed":
@@ -206,6 +215,11 @@ class KronosWorkflowNode:
                     run_id, "kronos", "completed", attempt, response.model_dump(mode="json")
                 )
                 return self._save(run_id, response)
+            except QuotaExceeded as error:
+                self._event(run_id, "failed", attempt, str(error))
+                return self._save(
+                    run_id, KronosResponse(status="failed", cache_key=key, warning=str(error))
+                )
             except Exception:
                 self.repository.upsert_graph_checkpoint(
                     run_id,

@@ -11,6 +11,7 @@ from typing import Literal
 from uuid import UUID, uuid4
 
 from financial_ai.storage.database import Database
+from financial_ai.quotas import Quotas, QuotaExceeded
 
 
 JobStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
@@ -46,6 +47,7 @@ class LocalResearchJobRunner:
     def __init__(self, database: Database, *, max_attempts: int = 3) -> None:
         self.database = database
         self.max_attempts = max_attempts
+        self.quotas = Quotas(database)
 
     def create(
         self,
@@ -65,10 +67,18 @@ class LocalResearchJobRunner:
         """Return interrupted/failed jobs to pending when retry budget permits."""
         recovered: list[UUID] = []
         with self.database.transaction() as connection:
+            connection.execute("UPDATE jobs SET attempt=attempt WHERE 0")
             rows = connection.execute(
                 "SELECT id, attempt FROM jobs WHERE status IN ('running', 'failed')"
             ).fetchall()
             for row in rows:
+                if (
+                    connection.execute(
+                        "SELECT COUNT(*) FROM jobs WHERE status='pending'"
+                    ).fetchone()[0]
+                    >= self.quotas.settings.max_pending_jobs
+                ):
+                    break
                 job_id = UUID(row["id"])
                 if int(row["attempt"]) >= self.max_attempts:
                     continue
@@ -95,14 +105,26 @@ class LocalResearchJobRunner:
             return True
 
     def run(self, job_id: UUID, handler: StepHandler | None = None) -> Job:
+        with self.quotas.context(self._job(job_id).run_id):
+            return self._run(job_id, handler)
+
+    def _run(self, job_id: UUID, handler: StepHandler | None = None) -> Job:
         with self.database.transaction() as connection:
+            connection.execute("UPDATE jobs SET attempt=attempt WHERE 0")
             row = connection.execute(
                 "SELECT run_id, status, attempt FROM jobs WHERE id = ?", (str(job_id),)
             ).fetchone()
             if row is None:
                 raise KeyError(f"Unknown job: {job_id}")
-            if row["status"] == "cancelled":
-                return Job(job_id, UUID(row["run_id"]), "cancelled", int(row["attempt"]))
+            if row["status"] in {"cancelled", "completed", "running"}:
+                return Job(job_id, UUID(row["run_id"]), row["status"], int(row["attempt"]))
+            if row["attempt"] >= self.max_attempts:
+                raise QuotaExceeded("Job retry attempts")
+            if (
+                connection.execute("SELECT COUNT(*) FROM jobs WHERE status='running'").fetchone()[0]
+                >= self.quotas.settings.max_running_jobs
+            ):
+                raise QuotaExceeded("Running jobs", 1)
             connection.execute(
                 "UPDATE jobs SET status = 'running', attempt = attempt + 1, updated_at = ? WHERE id = ?",
                 (_now(), str(job_id)),
@@ -128,6 +150,7 @@ class LocalResearchJobRunner:
                         connection, job_id, "progress", {"lane": lane, "percentage": percentage - 1}
                     )
                 if handler:
+                    self.quotas.charge("calls")
                     handler(lane)
                 with self.database.transaction() as connection:
                     connection.execute(
@@ -153,7 +176,12 @@ class LocalResearchJobRunner:
                     connection,
                     job_id,
                     "failed",
-                    {"retry_state": "available", "warning": str(error)[:120]},
+                    {
+                        "retry_state": "budget_exhausted"
+                        if isinstance(error, QuotaExceeded)
+                        else "available",
+                        "warning": str(error)[:200],
+                    },
                 )
         return self._job(job_id)
 
@@ -205,6 +233,12 @@ class LocalResearchJobRunner:
     def _insert(
         self, connection: sqlite3.Connection, job: Job, payload: dict[str, object] | None
     ) -> None:
+        connection.execute("UPDATE jobs SET attempt=attempt WHERE 0")
+        if (
+            connection.execute("SELECT COUNT(*) FROM jobs WHERE status='pending'").fetchone()[0]
+            >= self.quotas.settings.max_pending_jobs
+        ):
+            raise QuotaExceeded("Pending research queue", 5)
         connection.execute(
             """
             INSERT INTO jobs(id, run_id, kind, status, attempt, payload_json, created_at, updated_at)

@@ -7,6 +7,7 @@ from typing import Any
 from settings import Settings
 
 from financial_ai.llm.contracts import ChatMessage, ChatProvider, ChatResponse
+from financial_ai.quotas import limited_model
 
 
 class LLMConfigurationError(ValueError):
@@ -55,9 +56,12 @@ class GroqChatProvider:
         if self._client is None:
             from langchain_groq import ChatGroq
 
-            self._client = ChatGroq(model=self.model, api_key=self._api_key, temperature=0)
+            self._client = ChatGroq(
+                model=self.model, api_key=self._api_key, temperature=0, max_retries=0
+            )
         return self._client
 
+    @limited_model
     async def complete(self, messages: list[ChatMessage], *, token_budget: int) -> ChatResponse:
         response = await self._chat_client().ainvoke(
             [(message.role, message.content) for message in messages],
@@ -85,6 +89,7 @@ class OllamaChatProvider:
             self._client = ChatOllama(model=self.model, base_url=self._base_url, temperature=0)
         return self._client
 
+    @limited_model
     async def complete(self, messages: list[ChatMessage], *, token_budget: int) -> ChatResponse:
         response = await self._chat_client().ainvoke(
             [(message.role, message.content) for message in messages],

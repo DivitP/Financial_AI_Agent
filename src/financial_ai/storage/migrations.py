@@ -348,6 +348,23 @@ def _downgrade_0010(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE watchlists")
 
 
+def _upgrade_0011(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE quota_usage (
+        scope TEXT NOT NULL, resource TEXT NOT NULL, window INTEGER NOT NULL,
+        used INTEGER NOT NULL, PRIMARY KEY(scope, resource, window))""")
+    connection.execute("""CREATE TABLE quota_leases (
+        id TEXT PRIMARY KEY, scope TEXT NOT NULL, expires REAL NOT NULL)""")
+    connection.execute(
+        "CREATE TABLE quota_cooldowns (provider TEXT PRIMARY KEY, until REAL NOT NULL)"
+    )
+
+
+def _downgrade_0011(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE quota_cooldowns")
+    connection.execute("DROP TABLE quota_leases")
+    connection.execute("DROP TABLE quota_usage")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -359,4 +376,5 @@ MIGRATIONS = (
     Migration(8, "model_run_quality_history", _upgrade_0008, _downgrade_0008),
     Migration(9, "saved_research_history", _upgrade_0009, _downgrade_0009),
     Migration(10, "persistent_watchlists", _upgrade_0010, _downgrade_0010),
+    Migration(11, "durable_quotas", _upgrade_0011, _downgrade_0011),
 )

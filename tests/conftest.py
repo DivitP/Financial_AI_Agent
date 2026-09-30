@@ -10,6 +10,18 @@ import pytest
 
 
 @pytest.fixture
+def isolated_budget(tmp_path):
+    """Provider fixture calls use real quotas in a fresh database, not developer state."""
+    from financial_ai.storage.database import Database
+    from financial_ai.quotas import Quotas
+
+    db = Database(tmp_path / "fixture-quotas.db")
+    db.migrate_to_latest()
+    with Quotas(db).context("fixture-run"):
+        yield
+
+
+@pytest.fixture
 def import_main(monkeypatch: pytest.MonkeyPatch, tmp_path) -> ModuleType:
     """Import `main` with harmless test credentials and no project `.env` file."""
 

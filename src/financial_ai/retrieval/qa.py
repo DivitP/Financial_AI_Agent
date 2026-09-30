@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from financial_ai.llm.contracts import ChatMessage, ChatProvider
 from financial_ai.retrieval.index import ResearchIndex
 from financial_ai.data.documents import UnsafeDocument, document_text
+from financial_ai.quotas import Quotas, active_quotas, complete_chat
 
 
 class Question(BaseModel):
@@ -39,6 +40,11 @@ class ResearchQA:
         self.index, self.provider = index, provider
 
     async def answer(self, run_id: UUID, ticker: str, question: str) -> dict:
+        quotas = active_quotas() or Quotas(self.index.sources)
+        with quotas.context(run_id):
+            return await self._answer(run_id, ticker, question)
+
+    async def _answer(self, run_id: UUID, ticker: str, question: str) -> dict:
         now = datetime.now(UTC)
         queries = [q.strip() for q in re.split(r"[?;]|\band\b", question) if q.strip()][:3]
         context: dict[str, dict[str, str]] = {}
@@ -103,7 +109,7 @@ class ResearchQA:
             ),
         ]
         response = await asyncio.wait_for(
-            self.provider.complete(messages, token_budget=1500), timeout=45
+            complete_chat(self.provider, messages, token_budget=1500), timeout=45
         )
         try:
             draft = DraftAnswer.model_validate_json(response.content)

@@ -90,6 +90,13 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         redoc_url=None,
     )
     app.state.database = database
+    from financial_ai.quotas import Quotas, QuotaExceeded
+    from financial_ai.api.quotas import QuotaMiddleware, quota_response
+
+    quotas = Quotas(database)
+    app.state.quotas = quotas
+    app.add_middleware(QuotaMiddleware, quotas=quotas)
+    app.add_exception_handler(QuotaExceeded, lambda request, error: quota_response(error))
 
     @app.get("/docs", include_in_schema=False)
     def api_docs():
@@ -150,6 +157,8 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
         run = _run_or_error(repository, run_id)
         try:
             answer = await app.state.qa.answer(run_id, run["symbol"], payload.question)
+        except QuotaExceeded:
+            raise
         except AnswerRejected:
             raise ApiError(
                 "invalid_answer_citations",

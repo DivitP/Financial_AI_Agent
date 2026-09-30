@@ -9,6 +9,8 @@ from financial_ai.llm import ChatMessage, ChatResponse, create_chat_provider
 from financial_ai.prompts import MalformedModelResponse, PromptRegistry, StructuredPromptExecutor
 from settings import Settings
 
+pytestmark = pytest.mark.usefixtures("isolated_budget")
+
 
 class ScriptedProvider:
     provider = "fixture"

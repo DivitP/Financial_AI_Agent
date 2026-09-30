@@ -13,6 +13,14 @@ from xml.etree import ElementTree
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from financial_ai.data.http import HttpRequest, SharedHttpClient
+from financial_ai.quotas import active_quotas
+
+
+def budget_articles(articles):
+    quotas = active_quotas()
+    if quotas:
+        quotas.charge("articles", len(articles))
+    return articles
 
 
 class NewsSource(str, Enum):
@@ -64,19 +72,19 @@ class CompanyNewsCollector:
 
     def rss(self, feed: NewsFeed, retrieved_at: datetime) -> list[NewsArticle]:
         response = self.http.fetch(HttpRequest(provider=feed.source.value, url=feed.url))
-        return parse_rss(response.body, feed, retrieved_at)
+        return budget_articles(parse_rss(response.body, feed, retrieved_at))
 
     def gdelt(self, query: str, retrieved_at: datetime, max_records: int = 50) -> list[NewsArticle]:
         url = "https://api.gdeltproject.org/api/v2/doc/doc?" + urlencode(
             {"query": query, "mode": "artlist", "format": "json", "maxrecords": max_records}
         )
         response = self.http.fetch(HttpRequest(provider="gdelt", url=url))
-        return parse_gdelt(response.body, retrieved_at)
+        return budget_articles(parse_gdelt(response.body, retrieved_at))
 
     @staticmethod
     def openbb(fetcher: OpenBBNewsFetcher) -> list[NewsArticle]:
         """Use only an explicitly selected OpenBB source; do not silently substitute one."""
-        return list(fetcher())
+        return budget_articles(list(fetcher()))
 
 
 def parse_rss(payload: bytes, feed: NewsFeed, retrieved_at: datetime) -> list[NewsArticle]:

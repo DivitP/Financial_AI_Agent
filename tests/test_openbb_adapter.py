@@ -12,6 +12,8 @@ from financial_ai.instruments.resolver import InstrumentProfile
 from financial_ai.providers.errors import ProviderErrorCategory
 from financial_ai.providers.openbb import OpenBBMarketDataAdapter
 
+pytestmark = pytest.mark.usefixtures("isolated_budget")
+
 
 class FakeOpenBB:
     def __init__(self) -> None:

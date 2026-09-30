@@ -24,3 +24,17 @@ it("restores insufficient-evidence history", async () => {
   expect(await screen.findByText("Insufficient evidence")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Open exact source" })).not.toBeInTheDocument();
 });
+
+it("shows quota exhaustion without retrying the model request", async () => {
+  const fetcher = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify([])))
+    .mockResolvedValueOnce(new Response(JSON.stringify({
+      error: { code: "quota_exceeded", message: "Model budget reached. Saved results remain available." },
+    }), { status: 429 }));
+  vi.stubGlobal("fetch", fetcher);
+  render(<ResearchChat runId="fixture-run" />);
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: "What changed?" } });
+  fireEvent.submit(screen.getByRole("textbox").closest("form")!);
+  expect(await screen.findByText("Model budget reached. Saved results remain available.")).toBeVisible();
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});

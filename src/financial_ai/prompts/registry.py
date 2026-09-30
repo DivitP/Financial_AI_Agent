@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from financial_ai.llm.contracts import ChatMessage, ChatProvider
 from financial_ai.data.documents import UNTRUSTED_POLICY, document_envelope
+from financial_ai.quotas import complete_chat
 
 
 class PromptDefinition(BaseModel):
@@ -99,7 +100,9 @@ class StructuredPromptExecutor:
         messages = self.registry.render(definition, values)
         schema = self.registry.schema_for(definition)
         for attempt in range(retries + 1):
-            response = await self.provider.complete(messages, token_budget=definition.token_budget)
+            response = await complete_chat(
+                self.provider, messages, token_budget=definition.token_budget
+            )
             try:
                 output = schema.model_validate_json(response.content)
             except (ValidationError, json.JSONDecodeError) as error:

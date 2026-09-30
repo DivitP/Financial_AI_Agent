@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from datetime import datetime
 from decimal import Decimal
 from importlib.metadata import PackageNotFoundError, version
@@ -13,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from financial_ai.instruments.resolver import InstrumentProfile
 from financial_ai.providers.contracts import ProviderResult, Provenance
 from financial_ai.providers.errors import ProviderError, ProviderErrorCategory
+from financial_ai.quotas import current_quotas, QuotaExceeded
 
 
 REQUIRED_OPENBB_PACKAGES = ("openbb-core", "openbb-equity", "openbb-yfinance")
@@ -129,6 +132,19 @@ class OpenBBMarketDataAdapter:
             selected_provider=self.provider, installed=installed, missing_extensions=missing
         )
 
+    def _request(self, method, **kwargs):
+        quotas = current_quotas()
+        with quotas.slot("provider:" + self.provider, quotas.settings.provider_concurrency):
+            quotas.provider(self.provider)
+            quotas.charge("calls")
+            try:
+                return method(**kwargs)
+            except Exception as error:
+                if getattr(error, "status_code", None) == 429:
+                    quotas.cooldown(self.provider, 60)
+                    raise QuotaExceeded("Provider free-tier") from None
+                raise
+
     def client(self) -> Any:
         if self._client is not None:
             return self._client
@@ -144,14 +160,21 @@ class OpenBBMarketDataAdapter:
     async def quote(
         self, instrument: InstrumentProfile, instrument_id: UUID
     ) -> ProviderResult[QuoteObservation]:
-        return self._collect_one(instrument, instrument_id, "quote")
+        return await asyncio.to_thread(self._collect_one, instrument, instrument_id, "quote")
 
     async def profile(
         self, instrument: InstrumentProfile, instrument_id: UUID
     ) -> ProviderResult[CompanyProfileObservation]:
-        return self._collect_one(instrument, instrument_id, "profile")
+        return await asyncio.to_thread(self._collect_one, instrument, instrument_id, "profile")
 
     async def collect_market_data(
+        self, instrument: InstrumentProfile, instrument_id: UUID, start_date: str, end_date: str
+    ) -> ProviderResult[MarketDataCollection]:
+        return await asyncio.to_thread(
+            self._collect_market_data, instrument, instrument_id, start_date, end_date
+        )
+
+    def _collect_market_data(
         self, instrument: InstrumentProfile, instrument_id: UUID, start_date: str, end_date: str
     ) -> ProviderResult[MarketDataCollection]:
         """Collect yfinance quote/profile/history; actions are carried by historical data."""
@@ -169,13 +192,18 @@ class OpenBBMarketDataAdapter:
         try:
             client = self.client()
             quote_item = _first_result(
-                client.equity.price.quote(symbol=instrument.symbol, provider=self.provider)
+                self._request(
+                    client.equity.price.quote, symbol=instrument.symbol, provider=self.provider
+                )
             )
             profile_item = _first_result(
-                client.equity.profile(symbol=instrument.symbol, provider=self.provider)
+                self._request(
+                    client.equity.profile, symbol=instrument.symbol, provider=self.provider
+                )
             )
             historical = _all_results(
-                client.equity.price.historical(
+                self._request(
+                    client.equity.price.historical,
                     symbol=instrument.symbol,
                     start_date=start_date,
                     end_date=end_date,
@@ -230,6 +258,17 @@ class OpenBBMarketDataAdapter:
                 as_of=metadata.retrieved_at,
                 provenance=[_provenance(quote_item, metadata)],
             )
+        except QuotaExceeded as error:
+            return ProviderResult(
+                provider="openbb",
+                error=ProviderError(
+                    provider="openbb",
+                    category=ProviderErrorCategory.RATE_LIMITED,
+                    message=str(error),
+                    retryable=False,
+                    retry_after_seconds=error.retry_after,
+                ),
+            )
         except Exception:
             return ProviderResult(
                 provider="openbb",
@@ -254,9 +293,15 @@ class OpenBBMarketDataAdapter:
             )
         try:
             response = (
-                self.client().equity.price.quote(symbol=instrument.symbol, provider=self.provider)
+                self._request(
+                    self.client().equity.price.quote,
+                    symbol=instrument.symbol,
+                    provider=self.provider,
+                )
                 if kind == "quote"
-                else self.client().equity.profile(symbol=instrument.symbol, provider=self.provider)
+                else self._request(
+                    self.client().equity.profile, symbol=instrument.symbol, provider=self.provider
+                )
             )
             item = _first_result(response)
             metadata = _metadata(item, self.provider, instrument)
@@ -281,6 +326,17 @@ class OpenBBMarketDataAdapter:
                 data=data,
                 as_of=metadata.retrieved_at,
                 provenance=[_provenance(item, metadata)],
+            )
+        except QuotaExceeded as error:
+            return ProviderResult(
+                provider="openbb",
+                error=ProviderError(
+                    provider="openbb",
+                    category=ProviderErrorCategory.RATE_LIMITED,
+                    message=str(error),
+                    retryable=False,
+                    retry_after_seconds=error.retry_after,
+                ),
             )
         except Exception:
             return ProviderResult(
