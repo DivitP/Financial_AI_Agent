@@ -57,6 +57,13 @@ class Settings(BaseSettings):
         default=Path("data/runtime"),
         validation_alias=AliasChoices("FINANCIAL_AI_PERSIST_DIR", "PERSIST_DIR"),
     )
+    deployment_profile: Literal["local", "scaled"] = "local"
+    database_url: SecretStr | None = Field(default=None, repr=False)
+    redis_url: SecretStr | None = Field(default=None, repr=False)
+    redis_stream: str = Field(default="financial-ai:jobs", pattern=r"^[a-zA-Z0-9:_-]{1,80}$")
+    worker_handler_factory: str | None = None
+    worker_reclaim_seconds: int = Field(default=60, ge=30, le=3600)
+
     database_path: Path = Field(
         default=Path("data/runtime/financial_ai.db"),
         validation_alias="FINANCIAL_AI_DATABASE_PATH",
@@ -127,8 +134,23 @@ class Settings(BaseSettings):
             raise ValueError("configured model names must not be blank.")
         return value
 
+    def storage_target(self) -> Path | str:
+        if self.deployment_profile == "scaled":
+            assert self.database_url is not None
+            return self.database_url.get_secret_value()
+        return self.database_path
+
     @model_validator(mode="after")
     def validate_enabled_providers(self) -> "Settings":
+        if self.deployment_profile == "scaled":
+            if not self.database_url or not self.database_url.get_secret_value().startswith(
+                ("postgresql://", "postgres://")
+            ):
+                raise ValueError("Scaled profile requires a PostgreSQL DATABASE_URL.")
+            if not self.redis_url or not self.redis_url.get_secret_value().startswith(
+                ("redis://", "rediss://")
+            ):
+                raise ValueError("Scaled profile requires REDIS_URL.")
         if self.enable_kronos and self.kronos_model != "NeoQuasar/Kronos-small":
             raise ValueError(
                 "KRONOS_MODEL is not in the reviewed model manifest; use NeoQuasar/Kronos-small."

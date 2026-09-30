@@ -6,15 +6,28 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
+import hashlib
 
 from financial_ai.storage.migrations import MIGRATIONS
 
 
 class Database:
     def __init__(self, path: Path | str) -> None:
-        self.path = Path(path)
+        self.postgres = str(path).startswith(("postgresql://", "postgres://"))
+        self._url = str(path) if self.postgres else None
+        self.path = (
+            Path("data/runtime/postgres-" + hashlib.sha256(str(path).encode()).hexdigest()[:16])
+            if self.postgres
+            else Path(path)
+        )
+        self.identity = str(self.path.resolve())
 
-    def connect(self) -> sqlite3.Connection:
+    def connect(self) -> Any:
+        if self.postgres:
+            from financial_ai.storage.postgres import Connection
+
+            return Connection(self._url)
         if self.path != Path(":memory:"):
             self.path.parent.mkdir(parents=True, exist_ok=True)
         connection = sqlite3.connect(self.path)
@@ -30,6 +43,10 @@ class Database:
         if target_version not in valid_versions:
             raise ValueError(f"Unknown schema version: {target_version}")
         with self.transaction() as connection:
+            if self.postgres:
+                from financial_ai.storage.postgres import install_functions
+
+                install_functions(connection)
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL)"
             )

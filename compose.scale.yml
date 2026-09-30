@@ -1,0 +1,58 @@
+x-app: &app
+  build: .
+  init: true
+  restart: unless-stopped
+  environment: &environment
+    DEPLOYMENT_PROFILE: scaled
+    DATABASE_URL: postgresql://research:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your environment}@postgres:5432/research
+    REDIS_URL: redis://redis:6379/0
+    FINANCIAL_AI_PERSIST_DIR: /app/data/runtime
+    FINANCIAL_AI_APP_ENVIRONMENT: production
+    ALLOWED_HOSTS: '["localhost","127.0.0.1"]'
+    WORKER_HANDLER_FACTORY: ${WORKER_HANDLER_FACTORY:?Set a trusted module:function; see docs/deployment.md}
+  volumes:
+    - runtime:/app/data/runtime
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17.11
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: research
+      POSTGRES_USER: research
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U research -d research"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:8.2
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    <<: *app
+    ports: ["127.0.0.1:8000:8000"]
+    command: ["uvicorn", "financial_ai.api.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+  worker:
+    <<: *app
+    command: ["python", "-m", "financial_ai.workflow.redis_worker"]
+
+volumes:
+  postgres:
+  redis:
+  runtime:

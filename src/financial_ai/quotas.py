@@ -50,7 +50,7 @@ class Quotas:
                 raise QuotaExceeded(resource, 60 - now % 60)
             db.execute(
                 """INSERT INTO quota_usage VALUES (?, ?, ?, ?)
-                ON CONFLICT(scope, resource, window) DO UPDATE SET used=used+excluded.used""",
+                ON CONFLICT(scope, resource, window) DO UPDATE SET used=quota_usage.used+excluded.used""",
                 (scope, resource, window, amount),
             )
 
@@ -115,7 +115,8 @@ class Quotas:
 
 @lru_cache(maxsize=1)
 def default_quotas():
-    database = Database(get_settings().database_path)
+    settings = get_settings()
+    database = Database(settings.storage_target())
     database.migrate_to_latest()
     return Quotas(database)
 

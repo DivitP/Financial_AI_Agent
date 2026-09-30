@@ -136,6 +136,13 @@ class LocalResearchJobRunner:
                 if self._is_cancelled(job_id):
                     return self._job(job_id)
                 percentage = index * 100 // len(self.lanes)
+                with self.database.connect() as connection:
+                    completed = connection.execute(
+                        "SELECT status FROM job_steps WHERE job_id=? AND lane=?",
+                        (str(job_id), lane),
+                    ).fetchone()
+                if completed and completed["status"] == "completed":
+                    continue
                 with self.database.transaction() as connection:
                     connection.execute(
                         """
@@ -253,3 +260,4 @@ class LocalResearchJobRunner:
             ),
         )
         self._event(connection, job.id, "queued", {"percentage": 0})
+        connection.execute("INSERT INTO job_outbox(job_id) VALUES (?)", (str(job.id),))

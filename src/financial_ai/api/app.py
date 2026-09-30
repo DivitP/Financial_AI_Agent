@@ -70,16 +70,23 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db")) -> FastAPI:
+def create_app(database_path: Path | str | None = None) -> FastAPI:
     """Create an API that is operational without any external-provider credentials."""
 
     validate_chat_configuration(get_settings())
-    database = Database(database_path)
+    settings = get_settings()
+    target = database_path if database_path is not None else settings.storage_target()
+    database = Database(target)
+    runtime_path = settings.persist_dir / "scaled" if database.postgres else database.path.parent
     database.migrate_to_latest()
     repository = ResearchRepository(database)
     history = ResearchHistory(database)
     delta = ResearchDelta(database)
     runner = LocalResearchJobRunner(database)
+    if settings.deployment_profile == "scaled":
+        from financial_ai.workflow.redis_worker import RedisResearchJobRunner
+
+        runner = RedisResearchJobRunner(database, settings)
     logger = configure_logging()
 
     app = FastAPI(
@@ -119,13 +126,18 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
     app.include_router(comparison_router(database))
     app.include_router(portfolio_router(database))
     app.include_router(calendar_router(database))
-    app.include_router(export_router(database, Path(database_path).parent / "artifacts"))
+    app.include_router(export_router(database, runtime_path / "artifacts"))
     app.include_router(watchlist_router(Watchlists(database)))
     app.state.repository = repository
     app.state.runner = runner
     app.state.kronos = KronosWorkflowNode(repository, get_settings())
     app.state.qa = ResearchQA(
-        ResearchIndex(database, Path(database_path).with_suffix(".index.db")),
+        ResearchIndex(
+            database,
+            runtime_path / "research.index.db"
+            if database.postgres
+            else database.path.with_suffix(".index.db"),
+        ),
         create_chat_provider(get_settings()),
     )
     app.add_middleware(CorrelationIdMiddleware)
@@ -197,7 +209,12 @@ def create_app(database_path: Path | str = Path("data/runtime/financial_ai.db"))
 
     @app.get("/ready", response_model=HealthResponse, tags=["system"])
     def ready() -> HealthResponse:
-        database.current_version()
+        try:
+            database.current_version()
+            if settings.deployment_profile == "scaled":
+                runner.redis.ping()
+        except Exception:
+            raise ApiError("dependencies_unavailable", "Storage or queue is unavailable.", 503) from None
         return HealthResponse(status="ok")
 
     @app.get("/version", response_model=VersionResponse, tags=["system"])

@@ -365,6 +365,19 @@ def _downgrade_0011(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE quota_usage")
 
 
+def _upgrade_0012(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE job_outbox (
+        job_id TEXT PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,
+        next_publish_at REAL NOT NULL DEFAULT 0)""")
+    connection.execute(
+        "INSERT INTO job_outbox(job_id) SELECT id FROM jobs WHERE status IN ('pending','running')"
+    )
+
+
+def _downgrade_0012(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP TABLE job_outbox")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -377,4 +390,5 @@ MIGRATIONS = (
     Migration(9, "saved_research_history", _upgrade_0009, _downgrade_0009),
     Migration(10, "persistent_watchlists", _upgrade_0010, _downgrade_0010),
     Migration(11, "durable_quotas", _upgrade_0011, _downgrade_0011),
+    Migration(12, "redis_job_outbox", _upgrade_0012, _downgrade_0012),
 )
