@@ -21,6 +21,7 @@ dependencies = [
     "matplotlib>=3.9,<4",
     "newspaper4k>=0.9.3.1,<1",
     "numpy>=1.26,<3",
+    "opentelemetry-sdk>=1.30,<2",
     "pandas>=2.2,<3",
     "pydantic-settings>=2.6,<3",
     "python-dotenv>=1.0,<2",
@@ -41,6 +42,7 @@ build-backend = "hatchling.build"
 packages = ["src/financial_ai"]
 
 [project.optional-dependencies]
+observability = ["opentelemetry-exporter-otlp-proto-http>=1.30,<2"]
 scale = ["psycopg[binary]>=3.2,<4", "redis>=5.2,<6"]
 vector = ["chromadb>=1.0,<2", "sentence-transformers>=3.4,<6"]
 openbb = [

@@ -378,6 +378,22 @@ def _downgrade_0012(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE job_outbox")
 
 
+def _upgrade_0013(connection: sqlite3.Connection) -> None:
+    connection.execute("""CREATE TABLE telemetry_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, created_at REAL NOT NULL,
+        kind TEXT NOT NULL, component TEXT NOT NULL, outcome TEXT NOT NULL,
+        duration_ms REAL NOT NULL, attempt INTEGER NOT NULL,
+        status_code INTEGER, correlation_id TEXT, trace_id TEXT, span_id TEXT)""")
+    connection.execute("CREATE INDEX telemetry_run ON telemetry_events(run_id, id)")
+    connection.execute("CREATE INDEX telemetry_time ON telemetry_events(created_at)")
+    connection.execute("ALTER TABLE jobs ADD COLUMN traceparent TEXT")
+
+
+def _downgrade_0013(connection: sqlite3.Connection) -> None:
+    connection.execute("ALTER TABLE jobs DROP COLUMN traceparent")
+    connection.execute("DROP TABLE telemetry_events")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -391,4 +407,5 @@ MIGRATIONS = (
     Migration(10, "persistent_watchlists", _upgrade_0010, _downgrade_0010),
     Migration(11, "durable_quotas", _upgrade_0011, _downgrade_0011),
     Migration(12, "redis_job_outbox", _upgrade_0012, _downgrade_0012),
+    Migration(13, "run_observability", _upgrade_0013, _downgrade_0013),
 )

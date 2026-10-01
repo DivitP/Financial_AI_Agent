@@ -190,12 +190,17 @@ class KronosWorkflowNode:
                 quotas = Quotas(self.repository.database, self.settings)
 
                 def forecast():
+                    from financial_ai.observability import observe
+
                     with (
                         quotas.context(run_id),
                         quotas.slot("model:kronos", self.settings.provider_concurrency),
                     ):
                         quotas.charge("models")
-                        return self.quality.forecast(self.provider, prepared, symbol=run["symbol"])
+                        with observe("model", "kronos", attempt=attempt):
+                            return self.quality.forecast(
+                                self.provider, prepared, symbol=run["symbol"]
+                            )
 
                 record = await asyncio.to_thread(forecast)
                 if self.repository.get_run(run_id)["status"] == "cancelled":

@@ -98,6 +98,11 @@ def test_profile_vertical_flow_and_duplicate_delivery(profile):
     assert client.get("/api/v1/settings/health").status_code == 200
     assert client.get("/api/v1/research-runs").status_code == 200
     assert client.get("/ready").status_code == 200
+    audit = client.get(f"/api/v1/research-runs/{run_id}/audit").json()["events"]
+    assert any(event["kind"] == "node" and event["duration_ms"] >= 0 for event in audit)
+    assert any(event["kind"] == "job" and event["outcome"] == "completed" for event in audit)
+    metrics = client.get("/api/v1/observability/metrics").json()["metrics"]
+    assert any(row["kind"] == "node" and row["count"] > 0 for row in metrics)
 
 
 def test_profile_transactions_and_idempotency(profile):
@@ -152,4 +157,4 @@ def test_profile_migration_roundtrip(profile):
     db.migrate_to(0)
     assert db.current_version() == 0
     db.migrate_to_latest()
-    assert db.current_version() == 12
+    assert db.current_version() == 13

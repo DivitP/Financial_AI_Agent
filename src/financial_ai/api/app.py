@@ -62,7 +62,13 @@ APP_VERSION = "0.1.0"
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         try:
-            request.state.correlation_id = str(UUID(request.headers.get("X-Correlation-ID", "")))
+            request.state.correlation_id = str(
+                UUID(
+                    getattr(
+                        request.state, "correlation_id", request.headers.get("X-Correlation-ID", "")
+                    )
+                )
+            )
         except ValueError:
             request.state.correlation_id = str(uuid4())
         response = await call_next(request)
@@ -212,9 +218,11 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
         try:
             database.current_version()
             if settings.deployment_profile == "scaled":
-                runner.redis.ping()
+                getattr(runner, "redis").ping()
         except Exception:
-            raise ApiError("dependencies_unavailable", "Storage or queue is unavailable.", 503) from None
+            raise ApiError(
+                "dependencies_unavailable", "Storage or queue is unavailable.", 503
+            ) from None
         return HealthResponse(status="ok")
 
     @app.get("/version", response_model=VersionResponse, tags=["system"])
@@ -497,6 +505,24 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
             events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"}
         )
 
+    from financial_ai.api.telemetry import TelemetryMiddleware
+    from financial_ai.observability import TelemetryStore, tracer_provider
+
+    tracer_provider()  # Fail fast if trace export was enabled without its optional package.
+    telemetry = TelemetryStore(database)
+    telemetry.cleanup(settings.telemetry_retention_days)
+
+    @app.get("/api/v1/research-runs/{run_id}/audit")
+    def run_audit(run_id: UUID, after: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500)):
+        if repository.get_run(run_id) is None:
+            raise ApiError("run_not_found", "Research run not found.", 404)
+        return {"events": telemetry.audit(run_id, after, limit)}
+
+    @app.get("/api/v1/observability/metrics")
+    def metrics(minutes: int = Query(60, ge=1, le=1440)):
+        return {"window_minutes": minutes, "metrics": telemetry.metrics(minutes)}
+
+    app.add_middleware(TelemetryMiddleware, database=database)
     return app
 
 

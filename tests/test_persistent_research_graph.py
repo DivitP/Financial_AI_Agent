@@ -70,3 +70,11 @@ def test_graph_retries_a_node_within_its_retry_budget(tmp_path) -> None:
     graph = PersistentResearchGraph(repository, {"collect": flaky_node}, max_retries=1)
     assert asyncio.run(graph.run(run.id))["outputs"] == {"collect": {"ok": True}}
     assert attempts == 2
+    from financial_ai.observability import TelemetryStore
+
+    events = TelemetryStore(repository.database).audit(run.id)
+    attempts_logged = [event for event in events if event["kind"] == "node"]
+    assert [(event["attempt"], event["outcome"]) for event in attempts_logged] == [
+        (1, "error"),
+        (2, "ok"),
+    ]

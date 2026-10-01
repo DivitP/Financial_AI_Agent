@@ -105,8 +105,16 @@ class LocalResearchJobRunner:
             return True
 
     def run(self, job_id: UUID, handler: StepHandler | None = None) -> Job:
+        from contextlib import closing
+        from financial_ai.observability import observe
+
+        with closing(self.database.connect()) as connection:
+            row = connection.execute(
+                "SELECT traceparent FROM jobs WHERE id=?", (str(job_id),)
+            ).fetchone()
         with self.quotas.context(self._job(job_id).run_id):
-            return self._run(job_id, handler)
+            with observe("workflow", "research", parent=row[0] if row else None):
+                return self._run(job_id, handler)
 
     def _run(self, job_id: UUID, handler: StepHandler | None = None) -> Job:
         with self.database.transaction() as connection:
@@ -157,8 +165,11 @@ class LocalResearchJobRunner:
                         connection, job_id, "progress", {"lane": lane, "percentage": percentage - 1}
                     )
                 if handler:
-                    self.quotas.charge("calls")
-                    handler(lane)
+                    from financial_ai.observability import observe
+
+                    with observe("node", lane):
+                        self.quotas.charge("calls")
+                        handler(lane)
                 with self.database.transaction() as connection:
                     connection.execute(
                         "UPDATE job_steps SET status='completed', percentage=?, updated_at=? WHERE job_id=? AND lane=?",
@@ -232,6 +243,17 @@ class LocalResearchJobRunner:
 
     @staticmethod
     def _event(connection, job_id: UUID, kind: str, payload: dict[str, object]) -> None:
+        from financial_ai.observability import insert_event
+
+        row = connection.execute("SELECT run_id FROM jobs WHERE id=?", (str(job_id),)).fetchone()
+        if row:
+            insert_event(
+                connection,
+                run_id=row[0],
+                kind="job",
+                component=payload.get("lane", "research"),
+                outcome=kind,
+            )
         connection.execute(
             "INSERT INTO job_events(job_id, kind, payload_json, created_at) VALUES (?, ?, ?, ?)",
             (str(job_id), kind, json.dumps(payload, sort_keys=True), _now()),
@@ -240,6 +262,8 @@ class LocalResearchJobRunner:
     def _insert(
         self, connection: sqlite3.Connection, job: Job, payload: dict[str, object] | None
     ) -> None:
+        from financial_ai.observability import traceparent
+
         connection.execute("UPDATE jobs SET attempt=attempt WHERE 0")
         if (
             connection.execute("SELECT COUNT(*) FROM jobs WHERE status='pending'").fetchone()[0]
@@ -259,5 +283,6 @@ class LocalResearchJobRunner:
                 _now(),
             ),
         )
+        connection.execute("UPDATE jobs SET traceparent=? WHERE id=?", (traceparent(), str(job.id)))
         self._event(connection, job.id, "queued", {"percentage": 0})
         connection.execute("INSERT INTO job_outbox(job_id) VALUES (?)", (str(job.id),))

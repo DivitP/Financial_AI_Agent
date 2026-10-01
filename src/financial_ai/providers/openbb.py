@@ -138,7 +138,10 @@ class OpenBBMarketDataAdapter:
             quotas.provider(self.provider)
             quotas.charge("calls")
             try:
-                return method(**kwargs)
+                from financial_ai.observability import observe
+
+                with observe("provider", self.provider):
+                    return method(**kwargs)
             except Exception as error:
                 if getattr(error, "status_code", None) == 429:
                     quotas.cooldown(self.provider, 60)

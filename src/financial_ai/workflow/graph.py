@@ -77,10 +77,13 @@ class PersistentResearchGraph:
             for attempt in range(1, self.max_retries + 2):
                 self.repository.upsert_graph_checkpoint(run_id, name, "running", attempt)
                 try:
-                    current_quotas().charge("calls")
-                    payload = await asyncio.wait_for(
-                        self.nodes[name](), timeout=self.timeout_seconds
-                    )
+                    from financial_ai.observability import observe
+
+                    with observe("node", name, attempt=attempt):
+                        current_quotas().charge("calls")
+                        payload = await asyncio.wait_for(
+                            self.nodes[name](), timeout=self.timeout_seconds
+                        )
                 except Exception as error:
                     message = str(error)[:200] or type(error).__name__
                     self.repository.upsert_graph_checkpoint(

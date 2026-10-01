@@ -50,8 +50,11 @@ class InitialResearchWorkflow:
         lane_names = list(self.required_lanes)
 
         async def lane_call(lane):
-            current_quotas().charge("calls")
-            return await self.lanes[lane]()
+            from financial_ai.observability import observe
+
+            with observe("node", lane):
+                current_quotas().charge("calls")
+                return await self.lanes[lane]()
 
         results = await asyncio.gather(
             *(lane_call(lane) for lane in lane_names), return_exceptions=True

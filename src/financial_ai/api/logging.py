@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import UTC, datetime
+from financial_ai.observability import safe_event
 
 
 class JsonFormatter(logging.Formatter):
@@ -13,16 +14,17 @@ class JsonFormatter(logging.Formatter):
             {
                 "timestamp": datetime.now(UTC).isoformat(),
                 "level": record.levelname,
-                "message": record.getMessage(),
-                "logger": record.name,
-                "correlation_id": getattr(record, "correlation_id", None),
+                "message": "telemetry_unavailable"
+                if record.msg == "telemetry_unavailable"
+                else "application_event",
+                **safe_event(getattr(record, "safe_event", {})),
             },
             default=str,
         )
 
 
 def configure_logging() -> logging.Logger:
-    logger = logging.getLogger("financial_ai.api")
+    logger = logging.getLogger("financial_ai")
     if not logger.handlers:
         handler = logging.StreamHandler()
         handler.setFormatter(JsonFormatter())

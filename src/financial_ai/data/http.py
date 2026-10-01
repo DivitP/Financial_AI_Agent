@@ -60,6 +60,7 @@ class SharedHttpClient:
             transport = SafeTransport(get_settings().document_allowed_hosts)
             if quotas is None:
                 from financial_ai.quotas import current_quotas
+
                 quotas = current_quotas()
         self.quotas = quotas
         self.transport = transport
@@ -95,11 +96,14 @@ class SharedHttpClient:
             }
 
     def fetch(self, request: HttpRequest) -> HttpResponse:
+        from financial_ai.observability import record_event
+
         key = self._cache_key(request)
         with self._lock:
             cached = self._cache.get(key)
             if cached and cached[0] > self.monotonic():
                 self._cache_hits += 1
+                record_event("cache", request.provider, "hit")
                 return cached[1]
             future = self._inflight.get(key)
             if future is None:
@@ -110,8 +114,10 @@ class SharedHttpClient:
             else:
                 owner = False
         if not owner:
+            record_event("cache", request.provider, "deduplicated")
             return future.result(timeout=self.timeout_seconds * (self.max_retries + 1) + 30)
 
+        record_event("cache", request.provider, "miss")
         try:
             response = self._fetch_uncached(request)
             if 200 <= response.status_code < 300:
@@ -128,10 +134,12 @@ class SharedHttpClient:
 
     def _fetch_uncached(self, request: HttpRequest) -> HttpResponse:
         from financial_ai.quotas import active_quotas
+
         quotas = active_quotas() or self.quotas
         semaphore = self._semaphore(request.provider)
         if not semaphore.acquire(blocking=False):
             from financial_ai.quotas import QuotaExceeded
+
             raise QuotaExceeded("Provider concurrency", 1)
         try:
             for attempt in range(self.max_retries + 1):
@@ -144,14 +152,27 @@ class SharedHttpClient:
                 )
                 from contextlib import nullcontext
                 from financial_ai.quotas import QuotaExceeded
-                with (quotas.slot("provider:" + request.provider, quotas.settings.provider_concurrency)
-                      if quotas else nullcontext()):
+
+                with (
+                    quotas.slot(
+                        "provider:" + request.provider, quotas.settings.provider_concurrency
+                    )
+                    if quotas
+                    else nullcontext()
+                ):
                     if quotas:
                         quotas.charge("calls")
                         if request.provider == "article":
                             quotas.charge("articles")
                         quotas.provider(request.provider)
-                    response = self.transport(enriched, self.timeout_seconds, self.max_response_bytes)
+                    from financial_ai.observability import observe
+
+                    with observe("provider", request.provider, attempt=attempt + 1) as event:
+                        response = self.transport(
+                            enriched, self.timeout_seconds, self.max_response_bytes
+                        )
+                        event["status_code"] = response.status_code
+                        event["outcome"] = "error" if response.status_code >= 400 else "ok"
                 if len(response.body) > self.max_response_bytes:
                     raise HttpResponseTooLargeError(
                         "provider response exceeded configured size limit"
@@ -161,8 +182,12 @@ class SharedHttpClient:
                 if attempt == self.max_retries:
                     if response.status_code == 429:
                         if quotas:
-                            quotas.cooldown(request.provider, max(60, self._retry_delay(response, attempt)))
-                        raise QuotaExceeded("Provider free-tier", self._retry_delay(response, attempt))
+                            quotas.cooldown(
+                                request.provider, max(60, self._retry_delay(response, attempt))
+                            )
+                        raise QuotaExceeded(
+                            "Provider free-tier", self._retry_delay(response, attempt)
+                        )
                     return response
                 delay = self._retry_delay(response, attempt)
                 maximum = quotas.settings.max_retry_delay_seconds if quotas else 10
@@ -195,10 +220,13 @@ class SharedHttpClient:
 
     @staticmethod
     def _retry_delay(response: HttpResponse, attempt: int) -> float:
-        retry_after = next((v for k, v in response.headers.items() if k.lower() == "retry-after"), None)
+        retry_after = next(
+            (v for k, v in response.headers.items() if k.lower() == "retry-after"), None
+        )
         if retry_after:
             try:
                 import math
+
                 value = float(retry_after)
                 if math.isfinite(value):
                     return max(0.0, value)

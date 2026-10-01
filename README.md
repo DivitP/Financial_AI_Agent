@@ -147,3 +147,9 @@ reopen stored report versions without refreshing their data. See
 * Export to PDF with embedded charts.
 * Add authentication and saved workspaces.
 ---
+
+## Observability
+
+Run timing, provider/model metrics, and durable audit history are available
+without external monitoring services. See [observability](docs/observability.md)
+for the audit/metrics APIs, optional local OpenTelemetry export, and privacy rules.

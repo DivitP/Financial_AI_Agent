@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from financial_ai.storage.database import Database
 from settings import get_settings
+from financial_ai.observability import observe, telemetry_context
 
 
 class QuotaExceeded(RuntimeError):
@@ -32,7 +33,8 @@ class Quotas:
     def context(self, run_id=None):
         token = _context.set((self, str(run_id) if run_id is not None else None))
         try:
-            yield
+            with telemetry_context(self.database, run_id):
+                yield
         finally:
             _context.reset(token)
 
@@ -139,7 +141,10 @@ def research_budget(method):
             with quotas.slot("research workflows", quotas.settings.max_running_jobs):
                 import asyncio
 
-                return await asyncio.wait_for(method(self, run_id, *args, **kwargs), timeout=540)
+                with observe("workflow", "research"):
+                    return await asyncio.wait_for(
+                        method(self, run_id, *args, **kwargs), timeout=540
+                    )
 
     return wrapped
 
@@ -155,7 +160,8 @@ def limited_model(method):
             try:
                 import asyncio
 
-                return await asyncio.wait_for(method(self, *args, **kwargs), timeout=120)
+                with observe("model", provider):
+                    return await asyncio.wait_for(method(self, *args, **kwargs), timeout=120)
             except Exception as error:
                 if getattr(error, "status_code", None) == 429:
                     quotas.cooldown(provider, 60)

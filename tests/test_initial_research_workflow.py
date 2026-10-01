@@ -53,3 +53,10 @@ def test_parallel_lanes_persist_partial_results_when_one_provider_fails(tmp_path
     persisted_run = repository.get_run(run.id)
     assert persisted_run is not None and persisted_run["status"] == "completed"
     assert len(repository.snapshots(run.id)) == 5
+    from financial_ai.observability import TelemetryStore
+
+    events = TelemetryStore(database).audit(run.id)
+    nodes = {event["component"]: event for event in events if event["kind"] == "node"}
+    assert nodes["ohlcv"]["outcome"] == "error"
+    assert nodes["filings"]["outcome"] == "ok"
+    assert nodes["ohlcv"]["trace_id"] == nodes["filings"]["trace_id"]

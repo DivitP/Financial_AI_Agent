@@ -84,11 +84,16 @@ class ResearchRepository:
     def update_run_status(
         self, run_id: UUID, status: str, connection: sqlite3.Connection | None = None
     ) -> None:
-        self._execute(
-            connection,
-            "UPDATE research_runs SET status = ? WHERE id = ?",
-            (status, _id(run_id)),
+        from financial_ai.observability import insert_event
+
+        if connection is None:
+            with self.database.transaction() as transaction:
+                self.update_run_status(run_id, status, transaction)
+            return
+        connection.execute(
+            "UPDATE research_runs SET status = ? WHERE id = ?", (status, _id(run_id))
         )
+        insert_event(connection, run_id=run_id, kind="run", component="research", outcome=status)
 
     def get_run(self, run_id: UUID) -> sqlite3.Row | None:
         with self.database.connect() as connection:

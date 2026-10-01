@@ -129,6 +129,10 @@ def load_handler(value):
 
 
 def main():
+    from financial_ai.api.logging import configure_logging
+    from financial_ai.observability import TelemetryStore, tracer_provider
+
+    configure_logging()
     parser = argparse.ArgumentParser(description="Redis-backed research worker")
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
@@ -138,6 +142,8 @@ def main():
     factory = load_handler(settings.worker_handler_factory)
     database = Database(settings.storage_target())
     database.migrate_to_latest()
+    tracer_provider()
+    TelemetryStore(database).cleanup(settings.telemetry_retention_days)
     runner = RedisResearchJobRunner(database, settings)
     while True:
         try:
