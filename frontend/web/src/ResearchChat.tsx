@@ -1,5 +1,5 @@
 import { safeExternalUrl } from "./security";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 
 type Citation = { url: string; evidence_id: string; section: string; excerpt: string; published_at: string };
 type Claim = { text: string; citation: Citation };
@@ -11,6 +11,7 @@ export function ResearchChat({ runId }: { runId: string }) {
   const [pending, setPending] = useState(false);
   const [partial, setPartial] = useState<Claim[]>([]);
   const [error, setError] = useState("");
+  const questionInput = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const controller = new AbortController();
     fetch(`/api/v1/research-runs/${runId}/qa`, { signal: controller.signal })
@@ -58,22 +59,25 @@ export function ResearchChat({ runId }: { runId: string }) {
   return <section className="card" aria-label="Research chat">
     <h2>Ask about this research</h2>
     <div className="actions">{["What are the revenue risks?", "What changed in management guidance?"].map(text =>
-      <button className="secondary" key={text} disabled={pending} onClick={() => setQuestion(text)}>{text}</button>)}</div>
+      <button className="secondary" key={text} disabled={pending} onClick={() => { setQuestion(text); questionInput.current?.focus(); }}>{text}</button>)}</div>
     {history.map(turn => <article key={turn.id}><h3>{turn.question}</h3><p>{turn.answer.message}</p>
       {turn.answer.claims.map((claim, i) => <CitedClaim key={i} claim={claim} />)}</article>)}
-    <div aria-live="polite">{partial.map((claim, i) => <CitedClaim key={i} claim={claim} />)}{pending && <p>Checking evidence…</p>}</div>
+    <div>{partial.map((claim, i) => <CitedClaim key={i} claim={claim} />)}</div>
+    <p role="status" aria-atomic="true">{pending ? "Checking evidence…" : history.length ? "Saved answer available above. Each supported claim includes a source." : ""}</p>
     {error && <p role="alert">{error}</p>}
-    <form onSubmit={submit}><label>Research question<textarea value={question} maxLength={1000} onChange={e => setQuestion(e.target.value)} disabled={pending} /></label>
+    <form onSubmit={submit}><label>Research question<textarea ref={questionInput} value={question} maxLength={1000} onChange={e => setQuestion(e.target.value)} readOnly={pending} aria-describedby="question-help" /></label><small id="question-help">Enter at least 3 characters. Answers require supporting evidence.</small>
       <button disabled={pending || question.trim().length < 3}>Ask question</button></form>
   </section>;
 }
 
 function CitedClaim({ claim }: { claim: Claim }) {
   const [open, setOpen] = useState(false);
+  const id = useId();
+  const button = useRef<HTMLButtonElement>(null);
   const source = claim.citation;
-  return <div><blockquote>{claim.text}</blockquote><span onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-    <button className="secondary" aria-expanded={open} onFocus={() => setOpen(true)} onClick={() => setOpen(!open)}>Source: {source.section}</button>
-    {open && <aside><p>{source.excerpt}</p><small>{source.published_at} · {source.evidence_id}</small><p>
-      {/^https?:\/\//i.test(source.url) && <a href={safeExternalUrl(source.url)} target="_blank" rel="noopener noreferrer">Open exact source</a>}</p></aside>}
-  </span></div>;
+  return <div><blockquote>{claim.text}</blockquote><div onMouseEnter={() => setOpen(true)} onMouseLeave={e => { if (!e.currentTarget.contains(document.activeElement)) setOpen(false); }} onKeyDown={e => { if (e.key === "Escape" && open) { e.preventDefault(); setOpen(false); button.current?.focus(); } }}>
+    <button ref={button} className="secondary" aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>Source: {source.section}</button>
+    <aside id={id} hidden={!open}><p>{source.excerpt}</p><small>{source.published_at} · {source.evidence_id}</small><p>
+      {/^https?:\/\//i.test(source.url) && <a href={safeExternalUrl(source.url)} target="_blank" rel="noopener noreferrer">Open exact source</a>}</p></aside>
+  </div></div>;
 }

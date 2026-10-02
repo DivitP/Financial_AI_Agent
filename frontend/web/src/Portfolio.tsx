@@ -1,3 +1,4 @@
+import { Navigation } from "./Accessibility";
 import { safeExternalUrl } from "./security";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
@@ -20,7 +21,7 @@ export function PortfolioPage() {
     }
     setError(""); analysis.mutate({ holdings: rows, candidate });
   }
-  return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/">New research</Link><Link to="/history">Saved research</Link><Link to="/compare">Compare</Link></nav><main>
+  return <div className="app-shell"><Navigation /><main id="main-content" tabIndex={-1}>
     <h1>Hypothetical portfolio context</h1><p>Research only. No brokerage connection, order placement or trading execution. Inputs are not saved.</p>
     <form onSubmit={e => { e.preventDefault(); submit(); }}><label>Holdings (one ticker, weight percent per line)<textarea rows={5} maxLength={500} value={holdings} onChange={e => setHoldings(e.target.value)} /></label><label>Candidate ticker<input maxLength={15} value={ticker} onChange={e => setTicker(e.target.value)} /></label><label>Candidate weight percent<input type="number" min="0.01" max="99.99" step="any" value={weight} onChange={e => setWeight(e.target.value)} /></label><p>Existing holdings are reduced proportionally to fund the candidate.</p><button disabled={analysis.isPending}>Analyze hypothetical portfolio</button></form>
     {error && <p role="alert">{error}</p>}{analysis.error && <p role="alert">{analysis.error.message}</p>}{analysis.isPending && <p role="status">Analyzing saved data…</p>}

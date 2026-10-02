@@ -37,6 +37,10 @@ frontend-test:
 frontend-build:
 	npm --prefix frontend/web run build
 
+.PHONY: frontend-a11y
+frontend-a11y:
+	npm --prefix frontend/web run test:a11y
+
 check: lint format typecheck test frontend-lint frontend-test frontend-build
 
 .PHONY: kronos-benchmark

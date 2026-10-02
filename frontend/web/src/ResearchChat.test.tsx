@@ -13,7 +13,7 @@ it("streams validated excerpts and opens their exact citation", async () => {
   fireEvent.change(screen.getByLabelText("Research question"), { target: { value: "Revenue?" } });
   fireEvent.click(screen.getByRole("button", { name: "Ask question" }));
   expect(await screen.findByText("Source excerpts")).toBeInTheDocument();
-  expect(screen.getByText("Revenue faces pressure.")).toBeInTheDocument();
+  expect(screen.getByText("Revenue faces pressure.", { selector: "blockquote" })).toBeVisible();
   fireEvent.mouseEnter(screen.getByRole("button", { name: "Source: Risks" }));
   expect(await screen.findByRole("link", { name: "Open exact source" })).toHaveAttribute("href", "https://example.com/filing#risks");
 });

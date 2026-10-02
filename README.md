@@ -153,3 +153,9 @@ reopen stored report versions without refreshing their data. See
 Run timing, provider/model metrics, and durable audit history are available
 without external monitoring services. See [observability](docs/observability.md)
 for the audit/metrics APIs, optional local OpenTelemetry export, and privacy rules.
+
+## Accessibility QA
+
+See [accessibility and responsive QA](docs/accessibility-qa.md) for keyboard
+behavior, browser checks (`make frontend-a11y`), completed checks, and remaining
+screen-reader sign-off.

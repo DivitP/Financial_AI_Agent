@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { Navigation } from "./Accessibility";
+import { useId, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ForecastBand, ForecastResponse, researchApi } from "./api";
@@ -15,7 +16,7 @@ export function ForecastPage() {
   const { runId = "" } = useParams(); const [experimental, setExperimental] = useState(false); const client = useQueryClient();
   const query = useQuery({ queryKey: ["forecast", runId, experimental], queryFn: () => researchApi.forecast(runId, experimental), retry: false, refetchInterval: 5000 });
   const execute = useMutation({ mutationFn: () => researchApi.forecast(runId, experimental, true), onSuccess: () => client.invalidateQueries({ queryKey: ["forecast", runId] }) });
-  return <main className="app-shell forecast-page"><Link to={`/runs/${runId}`}>← Research overview</Link><h1>Kronos forecast research</h1>
+  return <div className="app-shell"><Navigation /><main id="main-content" tabIndex={-1} className="app-shell forecast-page"><Link to={`/runs/${runId}`}>← Research overview</Link><h1>Kronos forecast research</h1>
     <p>Sampled scenarios, not guaranteed price targets or investment advice.</p>
     <label className="forecast-opt-in"><input type="checkbox" checked={experimental} onChange={e => setExperimental(e.target.checked)} /> Show experimental research forecasts</label>
     <button className="secondary" disabled={execute.isPending} onClick={() => execute.mutate()}>{execute.isPending ? "Running local forecast…" : "Run or retry forecast"}</button>
@@ -23,7 +24,7 @@ export function ForecastPage() {
     {(query.error || execute.error) && <p role="alert">Forecast unavailable. Other research remains usable.</p>}
     {query.isLoading && <p role="status">Loading forecast…</p>}
     {query.data && <ForecastPanel data={query.data} />}
-  </main>;
+  </main></div>;
 }
 
 export function ForecastPanel({ data }: { data: ForecastResponse }) {
@@ -39,6 +40,7 @@ export function ForecastPanel({ data }: { data: ForecastResponse }) {
     {f && <>
       <section className="card"><h2>Historical candles and forecast distribution</h2>
         <p>Historical OHLC candles end at the cutoff. Shaded bands show sampled 5–95 and 25–75 percentiles; the dashed median is not a price target. Bands are not calibrated confidence intervals.</p>
+        <p className="muted">On narrow screens, swipe the chart or table, or focus it and use the arrow keys. Text descriptions and values are available below.</p>
         {usable ? <FanChart forecast={f} bands={bands} /> : <p role="status">Distribution unavailable or invalid. A single forecast line is not shown.</p>}
         {!f.historical_candles?.length && <p>Historical candlesticks unavailable for this saved forecast.</p>}
       </section>
@@ -53,6 +55,7 @@ export function ForecastPanel({ data }: { data: ForecastResponse }) {
         <p>Evaluation: {validation.status} · recorded {validation.created_at}</p>
         <div className="forecast-table" tabIndex={0} role="region" aria-label="Baseline metrics"><table><caption>Persisted out-of-sample comparison</caption><thead><tr>{["Model", "MAE", "RMSE", "MASE", "Direction", "90% band coverage", "Turnover", "Fold-end drawdown"].map(h => <th scope="col" key={h}>{h}</th>)}</tr></thead><tbody>{Object.entries(validation.models).map(([name, model]) => <tr key={name}><th scope="row">{name}</th><td>{number(model.metrics.mae)}</td><td>{number(model.metrics.rmse)}</td><td>{number(model.metrics.mase)}</td><td>{percent(model.metrics.terminal_direction_accuracy)}</td><td>{percent(model.metrics.interval_coverage)}</td><td>{number(model.turnover)}×</td><td>{percent(model.drawdown)}</td></tr>)}</tbody></table></div>
         <details><summary>Backtest windows by model</summary>{Object.entries(validation.models).map(([name, model]) => <section key={name}><h3>{name}</h3><ul>{model.windows.map((w, i) => <li key={i}>Training cutoff {w.as_of}; test {w.sessions[0]} → {w.sessions.at(-1)} ({w.sessions.length} sessions)</li>)}</ul></section>)}</details>
+        <details><summary>Read baseline metrics as a list</summary>{Object.entries(validation.models).map(([name, model]) => <section key={name}><h3>{name}</h3><dl>{Object.entries({ MAE: number(model.metrics.mae), RMSE: number(model.metrics.rmse), MASE: number(model.metrics.mase), Direction: percent(model.metrics.terminal_direction_accuracy), "90% band coverage": percent(model.metrics.interval_coverage), Turnover: number(model.turnover) + "×", "Fold-end drawdown": percent(model.drawdown) }).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></section>)}</details>
       </>}
       {validation && <ul aria-label="Validation limitations">{[...validation.reasons, ...validation.limitations].map((w, i) => <li key={i}>{w}</li>)}</ul>}
     </section>
@@ -60,6 +63,7 @@ export function ForecastPanel({ data }: { data: ForecastResponse }) {
 }
 
 function FanChart({ forecast: f, bands }: { forecast: NonNullable<ForecastResponse["forecast"]>; bands: ForecastBand[] }) {
+  const descriptionId = useId();
   const history = (f.historical_candles ?? []).slice(-60);
   const validHistory = history.every(c => [c.open, c.high, c.low, c.close].every(v => numeric(v) !== null && Number(v) > 0));
   if (!validHistory) return <p>Historical data is invalid; chart withheld.</p>;
@@ -69,16 +73,17 @@ function FanChart({ forecast: f, bands }: { forecast: NonNullable<ForecastRespon
   const count = history.length + bands.length, step = 660 / Math.max(count, 1), x = (i: number) => 75 + (i + .5) * step;
   const bandPath = (low: string, high: string) => [...bands.map((b, i) => `${x(history.length + i)},${y(Number(b.close_percentiles[high]))}`), ...bands.map((b, i) => `${x(history.length + i)},${y(Number(b.close_percentiles[low]))}`).reverse()].join(" ");
   return <>
-    <svg className="fan-chart" viewBox="0 0 800 300" role="img" aria-label="Historical candlesticks and uncertain forecast percentile bands, not a guaranteed price target">
+    <p id={descriptionId}>Chart summary: {history.length} historical sessions and {bands.length} forecast sessions in {f.currency}. Last historical close: {history.at(-1)?.close ?? "unavailable"}. Final sampled median: {number(bands.at(-1)?.close_percentiles["50"])}; 5th to 95th percentile range: {number(bands.at(-1)?.close_percentiles["5"])} to {number(bands.at(-1)?.close_percentiles["95"])}. Exact values are available below. Colors are not required to interpret the data.</p>
+    <div className="chart-scroll" tabIndex={0} role="region" aria-label="Forecast chart, scroll horizontally for detail"><svg className="fan-chart" viewBox="0 0 800 300" role="img" aria-describedby={descriptionId} aria-label="Historical candlesticks and uncertain forecast percentile bands, not a guaranteed price target">
       <text x="10" y="23">Price ({f.currency ?? "currency unavailable"})</text>
       {[lo, (lo + hi) / 2, hi].map((v, i) => <g key={i}><line x1="70" x2="745" y1={y(v)} y2={y(v)} stroke="#d1d5db" /><text x="5" y={y(v) - 3}>{number(v)}</text></g>)}
       {history.map((c, i) => <g key={c.session}><title>{c.session}: open {c.open}, high {c.high}, low {c.low}, close {c.close}</title><line x1={x(i)} x2={x(i)} y1={y(Number(c.high))} y2={y(Number(c.low))} stroke="#24364b" /><rect x={x(i) - Math.min(5, step / 3)} width={Math.min(10, step * 2 / 3)} y={Math.min(y(Number(c.open)), y(Number(c.close)))} height={Math.max(1, Math.abs(y(Number(c.open)) - y(Number(c.close))))} fill={Number(c.close) >= Number(c.open) ? "#147d68" : "#b64545"} /></g>)}
-      <polygon points={bandPath("5", "95")} fill="#d5ddff" /><polygon points={bandPath("25", "75")} fill="#95a9ed" />
+      <polygon points={bandPath("5", "95")} fill="#d5ddff" stroke="#526abd" strokeWidth="2" /><polygon points={bandPath("25", "75")} fill="#95a9ed" stroke="#344881" strokeDasharray="2 3" strokeWidth="2" />
       {bands.length === 1 && <line x1={x(history.length)} x2={x(history.length)} y1={y(Number(bands[0].close_percentiles["5"]))} y2={y(Number(bands[0].close_percentiles["95"]))} stroke="#667bc1" strokeWidth="12" />}
       <polyline points={bands.map((b, i) => `${x(history.length + i)},${y(Number(b.close_percentiles["50"]))}`).join(" ")} fill="none" stroke="#344881" strokeDasharray="5 4" strokeWidth="2" />
       <line x1={75 + history.length * step} x2={75 + history.length * step} y1="25" y2="260" stroke="#374151" strokeDasharray="3 3" />
       <text x="75" y="282">{history[0]?.session ?? "History unavailable"}</text><text x="740" y="282" textAnchor="end">{bands.at(-1)?.session}</text>
-    </svg>
+    </svg></div>
     <p className="muted">Vertical divider: forecast begins · light band: 5–95% · dark band: 25–75% · dashed: sampled median.</p>
     <details><summary>Accessible chart values</summary><div className="forecast-table" tabIndex={0} role="region" aria-label="Chart data"><table><caption>Historical OHLC and forecast closing-price percentiles ({f.currency})</caption><thead><tr><th scope="col">Session</th><th scope="col">Type</th><th scope="col">Values</th></tr></thead><tbody>{history.map(c => <tr key={c.session}><th scope="row">{c.session}</th><td>Historical</td><td>O {c.open} H {c.high} L {c.low} C {c.close}</td></tr>)}{bands.map(b => <tr key={b.session}><th scope="row">{b.session}</th><td>Forecast samples</td><td>{["5", "25", "50", "75", "95"].map(q => `${q}th: ${number(b.close_percentiles[q])}`).join(" · ")}</td></tr>)}</tbody></table></div></details>
   </>;

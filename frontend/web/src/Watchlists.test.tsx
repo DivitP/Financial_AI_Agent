@@ -28,6 +28,7 @@ it("creates lists and edits ticker notes without starting research", async () =>
   expect(screen.getByText("No saved research. Symbol has not been resolved.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Edit AAPL" }));
   expect(screen.getByLabelText("Ticker notes")).toHaveValue("My thesis");
+  expect(screen.getByLabelText("Ticker notes")).toHaveFocus();
   await waitFor(() => expect(fetchMock.mock.calls.every(([path]) => path.startsWith("/api/v1/watchlists"))).toBe(true));
 });
 

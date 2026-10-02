@@ -1,3 +1,4 @@
+import { Navigation } from "./Accessibility";
 import { safeExternalUrl } from "./security";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -12,7 +13,7 @@ export function CalendarPage() {
   const lists = useQuery({ queryKey: ["watchlists"], queryFn: () => request<{ id: string; name: string }[]>("/api/v1/watchlists") });
   const query = new URLSearchParams(Object.entries(applied).filter(([, value]) => value)).toString();
   const result = useQuery({ queryKey: ["calendar", query], queryFn: () => request<CalendarResult>("/api/v1/calendar?" + query), retry: false });
-  return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/">New research</Link><Link to="/watchlists">Watchlists</Link><Link to="/history">Saved research</Link></nav><main>
+  return <div className="app-shell"><Navigation /><main id="main-content" tabIndex={-1}>
     <h1>Catalyst and earnings calendar</h1><p>Saved watchlist events only. No provider requests or automatic research refresh.</p>
     <form onSubmit={e => { e.preventDefault(); setApplied({ ...filters }); }}><div className="form-grid"><label>Watchlist<select value={filters.watchlist_id} onChange={e => setFilters({ ...filters, watchlist_id: e.target.value })}><option value="">All watchlists</option>{lists.data?.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}</select></label><label>Start date<input type="date" required value={filters.start} onChange={e => setFilters({ ...filters, start: e.target.value })} /></label><label>End date (default 90 days)<input type="date" value={filters.end} onChange={e => setFilters({ ...filters, end: e.target.value })} /></label></div><button>Apply filters</button></form>
     {lists.error && <p role="alert">{lists.error.message}</p>}{result.error && <p role="alert">{result.error.message}</p>}{result.isLoading && <p role="status">Loading saved calendar…</p>}

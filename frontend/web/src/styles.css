@@ -19,3 +19,46 @@
 .forecast-table caption { text-align: left; font-weight: 600; padding: .5rem; }
 .forecast-page summary { cursor: pointer; padding: .6rem 0; }
 .table-scroll { overflow-x: auto; }
+
+/* Shared keyboard and reflow guarantees, including tables and native dialogs. */
+:focus-visible { outline: 3px solid #ffcf5c; outline-offset: 3px; }
+main:focus { outline-offset: 6px; }
+.skip-link { position: fixed; top: .5rem; left: 1rem; z-index: 10; padding: .75rem; background: #101d2e; transform: translateY(-200%); }
+.skip-link:focus { transform: none; }
+nav { flex-wrap: wrap; gap: .75rem 1rem; padding: 1rem 0; }
+.nav-links { display: flex; flex-wrap: wrap; gap: .4rem 1rem; }
+nav a { display: inline-flex; align-items: center; min-height: 44px; }
+nav a[aria-current="page"] { text-decoration: underline; text-underline-offset: .3em; font-weight: 750; }
+.brand { gap: .3em; }
+input::placeholder, textarea::placeholder { color: #aebdd0; opacity: 1; }
+main, .card, .form-grid > *, .dashboard-grid > * { min-width: 0; }
+body { overflow-wrap: anywhere; }
+button, input, select, summary { min-height: 44px; }
+summary { cursor: pointer; padding: .6rem .25rem; }
+.actions, .lanes li { flex-wrap: wrap; }
+button { white-space: normal; }
+.table-scroll, .forecast-table { max-width: 100%; padding: .25rem; }
+.table-scroll table { min-width: 36rem; }
+.forecast-table table { min-width: 48rem; }
+th { overflow-wrap: normal; }
+.chart-scroll { overflow-x: auto; padding: .25rem; }
+.chart-scroll .fan-chart { min-width: 600px; }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: .7rem; text-align: left; border-bottom: 1px solid #50627d; vertical-align: top; }
+caption { text-align: left; padding: .5rem; font-weight: 700; }
+.drawer { color: #e7edf7; margin: 0 0 0 auto; height: 100dvh; max-height: 100dvh; max-width: 100%; border: 1px solid #50627d; }
+.drawer::backdrop { background: #0009; }
+.drawer h2 { padding-right: 5rem; }
+.drawer a { overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .landing { padding: 2rem 0; }
+  .nav-links { width: 100%; }
+  .forecast-page { padding: 1rem 0; width: 100%; }
+  .drawer { padding: 1rem; }
+  .card { padding: 1rem; }
+  .actions > button { flex: 1 1 100%; }
+  .forecast-scenarios, .model-card { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

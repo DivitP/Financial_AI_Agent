@@ -1,3 +1,4 @@
+import { Navigation } from "./Accessibility";
 import { safeExternalUrl } from "./security";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -12,7 +13,7 @@ function Sources({ links }: { links: Citation[] }) {
 export function DeltaReport() {
   const { runId = "" } = useParams();
   const report = useQuery({ queryKey: ["delta", runId], queryFn: () => request<Delta>(`/api/v1/research-runs/${runId}/delta`), retry: false });
-  return <div className="app-shell"><nav aria-label="Primary navigation"><Link to="/">New research</Link><Link to="/history">Saved research</Link><Link to="/watchlists">Watchlists</Link></nav><main>
+  return <div className="app-shell"><Navigation /><main id="main-content" tabIndex={-1}>
     <h1>Changes since last run</h1><p>Saved-data comparison only. No providers or models are called.</p>
     {report.isLoading && <p role="status">Comparing saved research…</p>}{report.error && <p role="alert">{report.error.message}</p>}
     {report.data && <><p><Link to={`/history/${runId}`}>Open current saved run</Link>{report.data.previous_run_id && <> · <Link to={`/history/${report.data.previous_run_id}`}>Open previous saved run</Link></>}</p>

@@ -21,8 +21,8 @@ it("shows uncertain bands, provenance, scenarios, metrics and accessible values"
   const { container } = render(<ForecastPanel data={fixture} />);
   expect(screen.getByRole("img")).toHaveAccessibleName(/not a guaranteed price target/);
   expect(screen.getByText("pinned-model-v1")).toBeInTheDocument();
-  expect(screen.getByText("90%")).toBeInTheDocument();
-  expect(screen.getByText("12%")).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "90%" })).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "12%" })).toBeInTheDocument();
   expect(screen.getByText(/Experimental research/)).toBeInTheDocument();
   fireEvent.click(screen.getByText("Accessible chart values"));
   expect(screen.getByText(/O 100 H 105 L 98 C 102/)).toBeInTheDocument();

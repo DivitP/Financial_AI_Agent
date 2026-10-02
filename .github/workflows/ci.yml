@@ -41,6 +41,11 @@ jobs:
         run: npm ci
       - name: Validate frontend source
         run: make frontend-lint frontend-test frontend-build
+      - name: Install browser for accessibility checks
+        working-directory: frontend/web
+        run: npx playwright install --with-deps chromium
+      - name: Gate browser accessibility and responsive checks
+        run: make frontend-a11y
 
   deployment-profiles:
     name: Local and Postgres Redis integration
