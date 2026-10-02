@@ -165,3 +165,8 @@ screen-reader sign-off.
 See [performance targets and profiling](docs/performance.md) for bounded caches,
 pagination, display-only chart aggregation, and reproducible offline benchmarks
 (`make performance`).
+
+## Release evaluation
+
+Run `make release-eval` to produce offline release-quality reports, test logs and
+desktop/mobile browser screenshots. See [release gates and review requirements](docs/release-evaluation.md).

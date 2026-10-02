@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "as_of": "2026-09-30T20:00:00Z",
+  "notice": "Synthetic USD fixtures using familiar symbols; not actual company data or investment forecasts.",
+  "cases": [
+    {"ticker":"AAPL","asset_type":"equity","scenario":"profitable technology","revenue":100,"gross_profit":39,"market_cap":1000,"net_income":20,"expected_margin":"39.0%","expected_pe":50},
+    {"ticker":"JPM","asset_type":"equity","scenario":"financials missing gross profit","revenue":100,"gross_profit":null,"market_cap":500,"net_income":50,"expected_margin":null,"expected_pe":10},
+    {"ticker":"XOM","asset_type":"equity","scenario":"cyclical loss","revenue":200,"gross_profit":20,"market_cap":800,"net_income":-20,"expected_margin":"10.0%","expected_pe":null},
+    {"ticker":"TSLA","asset_type":"equity","scenario":"zero revenue edge case","revenue":0,"gross_profit":0,"market_cap":600,"net_income":0,"expected_margin":null,"expected_pe":null},
+    {"ticker":"SPY","asset_type":"etf","scenario":"broad diversified fund","weights":["0.06","0.04"],"expected_top_weight":"0.10","expected_hhi":"0.0052"},
+    {"ticker":"QQQ","asset_type":"etf","scenario":"concentrated sector exposure","weights":["0.30","0.20"],"expected_top_weight":"0.50","expected_hhi":"0.13"}
+  ]
+}

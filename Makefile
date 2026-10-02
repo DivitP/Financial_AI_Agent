@@ -48,6 +48,10 @@ performance:
 
 check: lint format typecheck test frontend-lint frontend-test frontend-build
 
+.PHONY: release-eval
+release-eval:
+	$(PYTHON) -m benchmarks.release
+
 .PHONY: kronos-benchmark
 kronos-benchmark:
 	$(PYTHON) -m pytest benchmarks/kronos --no-cov -q
