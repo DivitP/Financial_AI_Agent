@@ -1,6 +1,7 @@
 """Structural performance guarantees; timings live in the opt-in benchmark."""
 
 import json
+import time
 from uuid import UUID
 
 import pytest
@@ -9,6 +10,24 @@ from fastapi.testclient import TestClient
 from financial_ai.api import create_app
 from financial_ai.data.http import HttpRequest, HttpResponse, SharedHttpClient
 from financial_ai.providers.sec import SecFilingCollector
+
+
+def test_benchmark_queues_cold_requests_under_provider_limit(monkeypatch, capsys):
+    from benchmarks import system
+
+    def slow_client(transport):
+        def slow_transport(*args):
+            # Force overlap that fast local fixtures can accidentally conceal.
+            time.sleep(0.05)
+            return transport(*args)
+
+        return SharedHttpClient(slow_transport)
+
+    monkeypatch.setattr(system, "SharedHttpClient", slow_client)
+    system.main()
+    result = json.loads(capsys.readouterr().out)
+    assert result["provider_calls_cold_plus_20_warm"] == 5
+    assert result["provider_cache"]["hits"] == 100
 
 
 def test_snapshot_cache_revision_pagination_compression_and_streams(tmp_path):

@@ -25,6 +25,9 @@ The workflow benchmark creates fresh runs, executes the initial parallel workflo
 and persists results, but excludes worker queue delay, downstream agents and LLMs.
 Five cold provider requests plus 20 warm runs issue only five fixture transport
 calls in total. This does not establish live-provider throughput or latency.
+Cold fixture dispatch is queued within the HTTP client's two-provider-slot limit;
+it does not rely on fast transport timing to avoid concurrency rejection. An
+offline regression test delays transport to force overlapping requests.
 The browser navigation benchmark uses 20 page changes and asserts a maximum of
 25 rendered findings. CI applies deliberately looser shared-runner ceilings of
 5 seconds for dashboard load and 1 second p95 for report navigation. Python

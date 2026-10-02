@@ -6,6 +6,7 @@ import logging
 import math
 import platform
 import tempfile
+import threading
 import time
 from pathlib import Path
 from uuid import UUID
@@ -60,11 +61,16 @@ def main():
             return HttpResponse(200, {}, b'{"provider":"fixture","value":100}')
 
         http = SharedHttpClient(transport)
+        # Five cold lanes share one provider with two fail-fast request slots.
+        # Queue fixture dispatch explicitly instead of relying on thread timing.
+        dispatch = threading.BoundedSemaphore(http.provider_concurrency)
+
+        def fetch_lane(name):
+            with dispatch:
+                return http.fetch(HttpRequest("fixture", f"https://example.test/{name}"))
 
         async def lane(name):
-            response = await asyncio.to_thread(
-                http.fetch, HttpRequest("fixture", f"https://example.test/{name}")
-            )
+            response = await asyncio.to_thread(fetch_lane, name)
             return json.loads(response.body)
 
         lanes = {
@@ -78,7 +84,8 @@ def main():
             workflow = InitialResearchWorkflow(app.state.repository, lanes)
             start = time.perf_counter()
             snapshots = asyncio.run(workflow.run(UUID(created["id"])))
-            assert all(snapshot.status == "completed" for snapshot in snapshots)
+            failures = {s.lane: s.error for s in snapshots if s.status != "completed"}
+            assert not failures, f"Fixture workflow run {i} failed: {failures}"
             if i:
                 durations.append((time.perf_counter() - start) * 1000)
             # These benchmark runs execute the workflow directly, not the queued runner.
