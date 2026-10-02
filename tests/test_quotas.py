@@ -186,7 +186,7 @@ def test_exhausted_lane_preserves_successes(tmp_path):
     snapshots = asyncio.run(InitialResearchWorkflow(app.state.repository, lanes).run(run_id))
     assert sum(s.status == "completed" for s in snapshots) == 4
     assert "limit reached" in next(s.error for s in snapshots if s.lane == "filings")
-    assert app.state.repository.get_run(run_id)["status"] == "completed"
+    assert app.state.repository.get_run(run_id)["status"] == "failed"
 
 
 def test_quota_migration_downgrade(tmp_path):

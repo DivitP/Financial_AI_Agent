@@ -11,6 +11,7 @@ from uuid import UUID
 
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.quotas import research_budget, current_quotas
+from financial_ai.workflow.failures import failure_reason
 
 
 LaneCallable = Callable[[], Awaitable[dict[str, object]]]
@@ -54,7 +55,10 @@ class InitialResearchWorkflow:
 
             with observe("node", lane):
                 current_quotas().charge("calls")
-                return await self.lanes[lane]()
+                result = await self.lanes[lane]()
+                if not isinstance(result, dict) or not result:
+                    raise ValueError("Lane returned no structured data")
+                return result
 
         results = await asyncio.gather(
             *(lane_call(lane) for lane in lane_names), return_exceptions=True
@@ -63,7 +67,7 @@ class InitialResearchWorkflow:
         with self.repository.database.transaction() as connection:
             for lane, result in zip(lane_names, results, strict=True):
                 if isinstance(result, BaseException):
-                    snapshot = Snapshot(lane=lane, status="failed", error=str(result)[:200])
+                    snapshot = Snapshot(lane=lane, status="failed", error=failure_reason(result))
                 else:
                     snapshot = Snapshot(lane=lane, status="completed", payload=result)
                 self.repository.upsert_snapshot(
@@ -76,7 +80,7 @@ class InitialResearchWorkflow:
                 )
                 snapshots.append(snapshot)
             final_status = (
-                "completed" if any(item.status == "completed" for item in snapshots) else "failed"
+                "completed" if all(item.status == "completed" for item in snapshots) else "failed"
             )
             if not optional_forecast:
                 self.repository.update_run_status(run_id, final_status, connection)

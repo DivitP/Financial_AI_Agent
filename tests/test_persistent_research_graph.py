@@ -43,7 +43,9 @@ def test_graph_reuses_completed_checkpoints_after_restart(tmp_path) -> None:
     first = PersistentResearchGraph(
         repository, {"resolve": resolve, "quote": quote_fails_once}, max_retries=0
     )
-    assert asyncio.run(first.run(run.id))["errors"] == {"quote": "temporary provider outage"}
+    assert "timed out" in asyncio.run(first.run(run.id))["errors"]["quote"]
+    persisted = repository.get_run(run.id)
+    assert persisted is not None and persisted["status"] == "failed"
 
     restarted = PersistentResearchGraph(repository, {"resolve": resolve, "quote": quote_fails_once})
     state = asyncio.run(restarted.run(run.id))

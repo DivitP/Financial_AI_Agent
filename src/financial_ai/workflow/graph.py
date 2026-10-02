@@ -12,6 +12,7 @@ from langgraph.graph import END, START, StateGraph
 
 from financial_ai.storage.repositories import ResearchRepository
 from financial_ai.quotas import research_budget, current_quotas, QuotaExceeded
+from financial_ai.workflow.failures import failure_reason
 
 
 GraphNode = Callable[[], Awaitable[dict[str, object]]]
@@ -84,8 +85,10 @@ class PersistentResearchGraph:
                         payload = await asyncio.wait_for(
                             self.nodes[name](), timeout=self.timeout_seconds
                         )
+                        if not isinstance(payload, dict) or not payload:
+                            raise ValueError("Node returned no structured data")
                 except Exception as error:
-                    message = str(error)[:200] or type(error).__name__
+                    message = failure_reason(error)
                     self.repository.upsert_graph_checkpoint(
                         run_id, name, "failed", attempt, error_message=message
                     )
@@ -111,6 +114,6 @@ class PersistentResearchGraph:
         state = await self.graph.ainvoke(
             {"run_id": str(run_id), "outputs": {}, "errors": {}, "completed_nodes": []}
         )
-        status = "completed" if state.get("outputs") else "failed"
+        status = "completed" if state.get("outputs") and not state.get("errors") else "failed"
         self.repository.update_run_status(run_id, status)
         return state

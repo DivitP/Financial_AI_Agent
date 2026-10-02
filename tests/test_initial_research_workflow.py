@@ -51,7 +51,7 @@ def test_parallel_lanes_persist_partial_results_when_one_provider_fails(tmp_path
     }
     assert next(snapshot for snapshot in snapshots if snapshot.lane == "ohlcv").status == "failed"
     persisted_run = repository.get_run(run.id)
-    assert persisted_run is not None and persisted_run["status"] == "completed"
+    assert persisted_run is not None and persisted_run["status"] == "failed"
     assert len(repository.snapshots(run.id)) == 5
     from financial_ai.observability import TelemetryStore
 

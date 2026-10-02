@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 
 from financial_ai.storage.database import Database
 from financial_ai.quotas import Quotas, QuotaExceeded
+from financial_ai.workflow.failures import failure_reason
 
 
 JobStatus = Literal["pending", "running", "completed", "failed", "cancelled"]
@@ -138,6 +139,10 @@ class LocalResearchJobRunner:
                 (_now(), str(job_id)),
             )
             self._event(connection, job_id, "started", {"percentage": 0})
+            connection.execute(
+                "UPDATE research_runs SET status='running' WHERE id=? AND status!='cancelled'",
+                (str(row["run_id"]),),
+            )
 
         try:
             for index, lane in enumerate(self.lanes, start=1):
@@ -171,6 +176,11 @@ class LocalResearchJobRunner:
                         self.quotas.charge("calls")
                         handler(lane)
                 with self.database.transaction() as connection:
+                    run_status = connection.execute(
+                        "SELECT status FROM research_runs WHERE id=?", (str(row["run_id"]),)
+                    ).fetchone()
+                    if run_status and run_status["status"] == "failed":
+                        raise RuntimeError("Research has failed required lanes")
                     connection.execute(
                         "UPDATE job_steps SET status='completed', percentage=?, updated_at=? WHERE job_id=? AND lane=?",
                         (percentage, _now(), str(job_id), lane),
@@ -179,16 +189,33 @@ class LocalResearchJobRunner:
                         connection, job_id, "progress", {"lane": lane, "percentage": percentage}
                     )
             with self.database.transaction() as connection:
+                run = connection.execute(
+                    "SELECT status FROM research_runs WHERE id=?", (str(row["run_id"]),)
+                ).fetchone()
+                if run and run["status"] == "failed":
+                    raise RuntimeError("Research has failed required lanes")
                 connection.execute(
                     "UPDATE jobs SET status='completed', updated_at=? WHERE id=?",
                     (_now(), str(job_id)),
                 )
                 self._event(connection, job_id, "completed", {"percentage": 100})
+                connection.execute(
+                    "UPDATE research_runs SET status='completed' WHERE id=? AND status!='cancelled'",
+                    (str(row["run_id"]),),
+                )
         except Exception as error:
             with self.database.transaction() as connection:
                 connection.execute(
+                    "UPDATE research_runs SET status='failed' WHERE id=? AND status!='cancelled'",
+                    (str(row["run_id"]),),
+                )
+                connection.execute(
+                    "UPDATE job_steps SET status='failed', updated_at=? WHERE job_id=? AND status='running'",
+                    (_now(), str(job_id)),
+                )
+                connection.execute(
                     "UPDATE jobs SET status='failed', error_message=?, updated_at=? WHERE id=?",
-                    ("job execution failed", _now(), str(job_id)),
+                    (failure_reason(error), _now(), str(job_id)),
                 )
                 self._event(
                     connection,
@@ -197,8 +224,9 @@ class LocalResearchJobRunner:
                     {
                         "retry_state": "budget_exhausted"
                         if isinstance(error, QuotaExceeded)
+                        or self._job(job_id).attempt >= self.max_attempts
                         else "available",
-                        "warning": str(error)[:200],
+                        "warning": failure_reason(error),
                     },
                 )
         return self._job(job_id)
