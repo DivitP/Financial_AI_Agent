@@ -41,13 +41,15 @@ def profile(request, tmp_path, monkeypatch):
         database_url=postgres if request.param == "scaled" else None,
         redis_url=redis if request.param == "scaled" else None,
         redis_stream=schema,
-        database_path=tmp_path / "local.db",
-        persist_dir=tmp_path,
-        enable_groq=False,
-        enable_fmp=False,
-        enable_local_llm=False,
-        enable_kronos=False,
+        FINANCIAL_AI_DATABASE_PATH=tmp_path / "local.db",
+        FINANCIAL_AI_PERSIST_DIR=tmp_path,
+        ENABLE_GROQ=False,
+        ENABLE_FMP=False,
+        ENABLE_LOCAL_LLM=False,
+        ENABLE_KRONOS=False,
     )
+    assert settings.database_path == tmp_path / "local.db"
+    assert settings.persist_dir == tmp_path
     app_module = importlib.import_module("financial_ai.api.app")
     monkeypatch.setattr(app_module, "get_settings", lambda: settings)
     monkeypatch.setattr("financial_ai.quotas.get_settings", lambda: settings)
@@ -118,6 +120,34 @@ def test_profile_transactions_and_idempotency(profile):
     assert len(app.state.repository.snapshots(run_id)) == 1
     assert app.state.runner.cancel(job_id)
     assert app.state.runner._job(job_id).status == "cancelled"
+
+
+def test_profile_history_filters_and_archiving(profile):
+    app, client, _, run_id = create(profile)
+    path = f"/api/v1/research-runs/{run_id}/history"
+    from financial_ai.storage.history import ResearchHistory
+
+    # Direct call exposes database exceptions instead of only a safe HTTP 500.
+    assert ResearchHistory(app.state.database).list()[0]["id"] == str(run_id)
+    response = client.patch(path, json={"name": "100%_O'Brien thesis", "archived": True})
+    assert response.status_code == 200, response.text
+    assert response.json()["run"]["archived"] is True
+    assert client.get("/api/v1/research-runs").json() == []
+    for query in ("aapl", "THESIS", "%_", "O'Brien"):
+        response = client.get(
+            "/api/v1/research-runs",
+            params={"q": query, "archive": "archived", "status": "pending"},
+        )
+        assert response.status_code == 200, response.text
+        assert [row["id"] for row in response.json()] == [str(run_id)]
+    for filters in ({"q": "missing"}, {"status": "failed"}, {"offset": 1}):
+        assert (
+            client.get("/api/v1/research-runs", params={"archive": "all", **filters}).json() == []
+        )
+    response = client.patch(path, json={"archived": False})
+    assert response.status_code == 200, response.text
+    assert response.json()["run"]["archived"] is False
+    assert client.get("/api/v1/research-runs").json()[0]["name"] == "100%_O'Brien thesis"
 
 
 def test_profile_restart_resumes_completed_steps(profile):

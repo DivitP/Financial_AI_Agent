@@ -37,7 +37,11 @@ class ResearchHistory:
                 if field in fields:
                     db.execute(
                         f"UPDATE run_history_metadata SET {field}=?, updated_at=? WHERE run_id=?",
-                        (fields[field], datetime.now(UTC).isoformat(), str(run_id)),
+                        (
+                            int(fields[field]) if field == "archived" else fields[field],
+                            datetime.now(UTC).isoformat(),
+                            str(run_id),
+                        ),
                     )
 
     def reopen(self, run_id, version=None):

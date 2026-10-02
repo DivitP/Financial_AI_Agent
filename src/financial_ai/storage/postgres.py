@@ -20,7 +20,12 @@ def sql_for_postgres(sql, parameters=False):
     sql = "".join(
         (part.replace("%", "%%") if parameters else part)
         if i % 2
-        else (part.replace("%", "%%") if parameters else part).replace("?", "%s")
+        else re.sub(
+            r"\binstr(?=\s*\()",
+            "strpos",
+            (part.replace("%", "%%") if parameters else part).replace("?", "%s"),
+            flags=re.I,
+        )
         for i, part in enumerate(pieces)
     )
     sql = re.sub(r"INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY", sql, flags=re.I)

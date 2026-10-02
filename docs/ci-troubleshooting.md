@@ -5,6 +5,24 @@ offline Python tests, TypeScript checks, frontend unit tests and the web build.
 CI additionally installs locked dependencies and runs the RAG evaluation gate.
 Do not treat a local pass as a verified GitHub runner pass.
 
+For deployment-profile failures, run against disposable Postgres and Redis
+services rather than accepting skipped scaled tests:
+
+```bash
+TEST_POSTGRES_URL=postgresql://research@127.0.0.1:56439/research_test \
+TEST_REDIS_URL=redis://127.0.0.1:56440/0 \
+uv run --extra scale pytest tests/test_deployment_profiles.py --no-cov
+```
+
+The history-list HTTP 500 on Postgres was a missing SQLite `instr()` translation;
+the adapter now uses Postgres `strpos()` outside SQL literals. Archive flags
+are stored as integers on both databases. Regression tests cover empty search,
+case-insensitive literal substring searches, punctuation, status/pagination,
+and archive/restore. The fixture must use settings' validation aliases for its
+temporary paths; assertions protect against accidentally using the default
+runtime database in the migration roundtrip test. Never point these tests at
+production services.
+
 The comparison change required explicit types for its nested metric-row
 dictionary; otherwise mypy stopped the quality job before tests ran.
 
