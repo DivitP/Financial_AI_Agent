@@ -46,6 +46,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Gate browser accessibility and responsive checks
         run: make frontend-a11y
+      - name: Measure offline performance and gate browser rendering budgets
+        run: make performance
 
   deployment-profiles:
     name: Local and Postgres Redis integration

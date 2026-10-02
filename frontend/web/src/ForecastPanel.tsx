@@ -1,5 +1,6 @@
 import { Navigation } from "./Accessibility";
 import { useId, useState } from "react";
+import { downsampleCandles } from "./downsample";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ForecastBand, ForecastResponse, researchApi } from "./api";
@@ -64,8 +65,9 @@ export function ForecastPanel({ data }: { data: ForecastResponse }) {
 
 function FanChart({ forecast: f, bands }: { forecast: NonNullable<ForecastResponse["forecast"]>; bands: ForecastBand[] }) {
   const descriptionId = useId();
-  const history = (f.historical_candles ?? []).slice(-60);
-  const validHistory = history.every(c => [c.open, c.high, c.low, c.close].every(v => numeric(v) !== null && Number(v) > 0));
+  const sourceHistory = f.historical_candles ?? [];
+  const history = downsampleCandles(sourceHistory);
+  const validHistory = sourceHistory.every(c => [c.open, c.high, c.low, c.close].every(v => numeric(v) !== null && Number(v) > 0));
   if (!validHistory) return <p>Historical data is invalid; chart withheld.</p>;
   const prices = [...history.flatMap(c => [Number(c.high), Number(c.low)]), ...bands.flatMap(b => [Number(b.close_percentiles["5"]), Number(b.close_percentiles["95"])])];
   const lo = Math.min(...prices), hi = Math.max(...prices), span = hi - lo || hi * .02 || 1;
@@ -74,6 +76,7 @@ function FanChart({ forecast: f, bands }: { forecast: NonNullable<ForecastRespon
   const bandPath = (low: string, high: string) => [...bands.map((b, i) => `${x(history.length + i)},${y(Number(b.close_percentiles[high]))}`), ...bands.map((b, i) => `${x(history.length + i)},${y(Number(b.close_percentiles[low]))}`).reverse()].join(" ");
   return <>
     <p id={descriptionId}>Chart summary: {history.length} historical sessions and {bands.length} forecast sessions in {f.currency}. Last historical close: {history.at(-1)?.close ?? "unavailable"}. Final sampled median: {number(bands.at(-1)?.close_percentiles["50"])}; 5th to 95th percentile range: {number(bands.at(-1)?.close_percentiles["5"])} to {number(bands.at(-1)?.close_percentiles["95"])}. Exact values are available below. Colors are not required to interpret the data.</p>
+    {sourceHistory.length > history.length && <p>Display only: {sourceHistory.length} historical sessions aggregated into {history.length} OHLC buckets, preserving highs/lows and opening/closing prices. Bucket values below are aggregates, not individual sessions. Stored data and forecasts are unchanged.</p>}
     <div className="chart-scroll" tabIndex={0} role="region" aria-label="Forecast chart, scroll horizontally for detail"><svg className="fan-chart" viewBox="0 0 800 300" role="img" aria-describedby={descriptionId} aria-label="Historical candlesticks and uncertain forecast percentile bands, not a guaranteed price target">
       <text x="10" y="23">Price ({f.currency ?? "currency unavailable"})</text>
       {[lo, (lo + hi) / 2, hi].map((v, i) => <g key={i}><line x1="70" x2="745" y1={y(v)} y2={y(v)} stroke="#d1d5db" /><text x="5" y={y(v) - 3}>{number(v)}</text></g>)}

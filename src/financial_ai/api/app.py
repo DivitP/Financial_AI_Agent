@@ -137,6 +137,11 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
     app.state.repository = repository
     app.state.runner = runner
     app.state.kronos = KronosWorkflowNode(repository, get_settings())
+    from financial_ai.api.snapshots import SnapshotReader
+    from starlette.middleware.gzip import GZipMiddleware
+
+    app.state.snapshot_reader = SnapshotReader(database, app.state.kronos.read)
+    app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=4)
     app.state.qa = ResearchQA(
         ResearchIndex(
             database,
@@ -159,11 +164,14 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
 
     @app.get("/api/v1/research-runs/{run_id}/qa", tags=["research"])
-    def qa_history(run_id: UUID):
+    def qa_history(
+        run_id: UUID, limit: int = Query(100, ge=1, le=100), before: int | None = Query(None, ge=1)
+    ):
         _run_or_error(repository, run_id)
         with database.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM qa_history WHERE run_id=? ORDER BY id DESC LIMIT 100", (str(run_id),)
+                "SELECT id, question, answer_json FROM qa_history WHERE run_id=? AND (? IS NULL OR id<?) ORDER BY id DESC LIMIT ?",
+                (str(run_id), before, before, limit),
             ).fetchall()
         return [
             {"id": r["id"], "question": r["question"], "answer": json.loads(r["answer_json"])}
@@ -324,23 +332,17 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
         response_model=list[ResearchSnapshotResponse],
         tags=["research"],
     )
-    def get_initial_snapshot(run_id: UUID) -> list[ResearchSnapshotResponse]:
+    def get_initial_snapshot(
+        run_id: UUID,
+        request: Request,
+        limit: int = Query(50, ge=1, le=50),
+        offset: int = Query(0, ge=0),
+        lane: str | None = Query(None, max_length=80, pattern=r"^[a-z_]+$"),
+    ):
         _run_or_error(repository, run_id)
-        return [
-            ResearchSnapshotResponse(
-                lane=row["lane"],
-                status=row["status"],
-                payload=(
-                    app.state.kronos.read(run_id).model_dump(mode="json")
-                    if row["lane"] == "kronos"
-                    else json.loads(row["payload_json"])
-                    if row["payload_json"]
-                    else None
-                ),
-                error_message=row["error_message"],
-            )
-            for row in repository.snapshots(run_id)
-        ]
+        return app.state.snapshot_reader.read(
+            run_id, request, limit=limit, offset=offset, lane=lane
+        )
 
     @app.get(
         "/api/v1/research-runs/{run_id}/forecast", response_model=KronosResponse, tags=["research"]
@@ -520,7 +522,11 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
 
     @app.get("/api/v1/observability/metrics")
     def metrics(minutes: int = Query(60, ge=1, le=1440)):
-        return {"window_minutes": minutes, "metrics": telemetry.metrics(minutes)}
+        return {
+            "window_minutes": minutes,
+            "metrics": telemetry.metrics(minutes),
+            "snapshot_cache": app.state.snapshot_reader.profile(),
+        }
 
     app.add_middleware(TelemetryMiddleware, database=database)
     return app

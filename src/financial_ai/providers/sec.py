@@ -96,6 +96,18 @@ class SecFilingCollector:
     def collect_filings(self, ticker: str) -> list[SecFilingMetadata]:
         """Fetch SEC submissions through the shared client; no key is required."""
 
+        result = self.collect_filings_many([ticker])[ticker.upper()]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    def collect_filings_many(
+        self, tickers: list[str]
+    ) -> dict[str, list[SecFilingMetadata] | Exception]:
+        """One company mapping fetch, bounded submissions dispatch and per-ticker failures."""
+        if len(tickers) > 50:
+            raise ValueError("SEC batch is limited to 50 tickers")
+
         if self.http is None:
             raise RuntimeError(
                 "SEC collector requires a configured SharedHttpClient for live collection"
@@ -107,15 +119,23 @@ class SecFilingCollector:
                 )
             )
         )
-        company = companies.get(ticker.upper())
-        if company is None:
-            return []
-        submissions = _json_object(
-            self.http.fetch(
+        selected = {ticker.upper(): companies.get(ticker.upper()) for ticker in tickers}
+        known = {symbol: company for symbol, company in selected.items() if company is not None}
+        responses = self.http.fetch_many(
+            [
                 HttpRequest("sec", f"https://data.sec.gov/submissions/CIK{company.cik}.json")
-            )
+                for company in known.values()
+            ]
         )
-        return self.filings(company.cik, submissions)
+        result: dict[str, list[SecFilingMetadata] | Exception] = {symbol: [] for symbol in selected}
+        for (symbol, company), response in zip(known.items(), responses, strict=True):
+            try:
+                if isinstance(response, Exception):
+                    raise response
+                result[symbol] = self.filings(company.cik, _json_object(response))
+            except Exception as error:
+                result[symbol] = error
+        return result
 
     def collect_xbrl_facts(
         self,

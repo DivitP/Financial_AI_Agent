@@ -187,4 +187,4 @@ def test_profile_migration_roundtrip(profile):
     db.migrate_to(0)
     assert db.current_version() == 0
     db.migrate_to_latest()
-    assert db.current_version() == 13
+    assert db.current_version() == 14

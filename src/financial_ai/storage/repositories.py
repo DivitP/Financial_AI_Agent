@@ -122,7 +122,8 @@ class ResearchRepository:
             INSERT INTO research_snapshots(run_id, lane, status, payload_json, error_message, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(run_id, lane) DO UPDATE SET status=excluded.status, payload_json=excluded.payload_json,
-                error_message=excluded.error_message, updated_at=excluded.updated_at
+                error_message=excluded.error_message, updated_at=excluded.updated_at,
+                revision=research_snapshots.revision+1
             """,
             (
                 _id(run_id),

@@ -1,23 +1,25 @@
+import { ReportSections } from "./ReportSections";
 import { Navigation, RouteAccessibility, EvidenceDialog } from "./Accessibility";
 import { safeExternalUrl } from "./security";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import { ApiFailure, researchApi, ResearchReport, ResearchRequest, ResearchSnapshot, subscribeToRun } from "./api";
 import { ResearchChat } from "./ResearchChat";
-import { ForecastPage } from "./ForecastPanel";
-import { HistoryPage, SavedRunPage } from "./ResearchHistory";
-import { WatchlistsPage } from "./Watchlists";
-import { DeltaReport } from "./DeltaReport";
-import { ComparisonPage } from "./Comparison";
-import { PortfolioPage } from "./Portfolio";
-import { CalendarPage } from "./Calendar";
-import { SettingsConsole } from "./SettingsConsole";
+const ForecastPage = lazy(() => import("./ForecastPanel").then(module => ({ default: module.ForecastPage })));
+const HistoryPage = lazy(() => import("./ResearchHistory").then(module => ({ default: module.HistoryPage })));
+const SavedRunPage = lazy(() => import("./ResearchHistory").then(module => ({ default: module.SavedRunPage })));
+const WatchlistsPage = lazy(() => import("./Watchlists").then(module => ({ default: module.WatchlistsPage })));
+const DeltaReport = lazy(() => import("./DeltaReport").then(module => ({ default: module.DeltaReport })));
+const ComparisonPage = lazy(() => import("./Comparison").then(module => ({ default: module.ComparisonPage })));
+const PortfolioPage = lazy(() => import("./Portfolio").then(module => ({ default: module.PortfolioPage })));
+const CalendarPage = lazy(() => import("./Calendar").then(module => ({ default: module.CalendarPage })));
+const SettingsConsole = lazy(() => import("./SettingsConsole").then(module => ({ default: module.SettingsConsole })));
 
 const tickerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$/;
 
 export function App() {
-  return <><RouteAccessibility /><Routes><Route path="/" element={<ResearchForm />} /><Route path="/settings" element={<SettingsConsole />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/portfolio" element={<PortfolioPage />} /><Route path="/compare" element={<ComparisonPage />} /><Route path="/watchlists" element={<WatchlistsPage />} /><Route path="/history" element={<HistoryPage />} /><Route path="/history/:runId" element={<SavedRunPage />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/changes" element={<DeltaReport />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
+  return <><RouteAccessibility /><Suspense fallback={<Shell><main id="main-content" tabIndex={-1}><p role="status">Loading view…</p></main></Shell>}><Routes><Route path="/" element={<ResearchForm />} /><Route path="/settings" element={<SettingsConsole />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/portfolio" element={<PortfolioPage />} /><Route path="/compare" element={<ComparisonPage />} /><Route path="/watchlists" element={<WatchlistsPage />} /><Route path="/history" element={<HistoryPage />} /><Route path="/history/:runId" element={<SavedRunPage />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/changes" element={<DeltaReport />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></>;
 }
 
 function ResearchForm() {
@@ -59,7 +61,7 @@ function Progress({ snapshots, status }: { snapshots: ResearchSnapshot[]; status
 
 function Overview({ snapshots, ticker, assetType, report }: { snapshots: ResearchSnapshot[]; ticker: string; assetType: "equity" | "etf"; report?: ResearchReport }) { const [evidence, setEvidence] = useState<ResearchSnapshot | null>(null); const quote = snapshots.find((item) => item.lane === "quote")?.payload; const identity = snapshots.find((item) => item.lane === "instrument")?.payload; const peerData = snapshots.find((item) => item.lane === "peers")?.payload ?? null; const earningsData = snapshots.find((item) => item.lane === "earnings")?.payload ?? null; const guidanceData = snapshots.find((item) => item.lane === "guidance")?.payload ?? null; const analystData = snapshots.find((item) => item.lane === "analysts")?.payload ?? null; const etfData = snapshots.find((item) => item.lane === "etf")?.payload ?? null; const qualityData = snapshots.find((item) => item.lane === "quality")?.payload ?? null; const technicalData = snapshots.find((item) => item.lane === "technical")?.payload ?? null; const isEtf = assetType === "etf"; return <><section className="dashboard-grid" aria-label="Research overview"><InfoCard title={isEtf ? "Fund identity" : "Company identity"} value={stringValue(identity, "name") ?? ticker} detail={stringValue(identity, "exchange") ?? "Identity source pending"} /><InfoCard title="Quote" value={stringValue(quote, "price") ?? "Unavailable"} detail={freshness(quote)} />{isEtf ? <ETFPanel data={etfData} /> : <><InfoCard title="Financial trends" value={summary(snapshots, "statements")} detail="Reported figures retain filing periods and units." /><InfoCard title="Latest filings" value={summary(snapshots, "filings")} detail="Source links are retained with the evidence." /></>}</section>{report && <ReportPanel report={report} />}{!isEtf && <><EarningsPanel earnings={earningsData} guidance={guidanceData} analysts={analystData} /><PeerPanel data={peerData} /></>}<QualityPanel data={qualityData} /><TechnicalPanel data={technicalData} /><section className="card"><h2>Evidence</h2><p className="muted">Open a collection result to inspect its exact source links and payload. No language model is required for this view.</p><div className="evidence-list">{snapshots.map((item) => <button className="evidence-button" key={item.lane} onClick={() => setEvidence(item)}>{item.lane}<Status status={item.status} /></button>)}</div></section>{evidence && <EvidenceDrawer snapshot={evidence} onClose={() => setEvidence(null)} />}</>; }
 
-function ReportPanel({ report }: { report: ResearchReport }) { return <section className="card" aria-labelledby="report-heading"><h2 id="report-heading">Decision brief</h2><p className="muted">As of {report.as_of} · report version {report.version}</p><ul>{report.decision_brief.map((item) => <li key={item}>{item}</li>)}</ul>{report.sections.map((section) => <section key={section.title}><h3>{section.title}</h3>{section.findings.map((finding) => <article key={finding.summary}><p>{finding.summary}</p><p className="muted">Evidence: {finding.evidence_ids.map((id) => <a key={id} href={safeExternalUrl(report.evidence_links[id])} target="_blank" rel="noopener noreferrer">{id}</a>)}</p></article>)}</section>)}</section>; }
+function ReportPanel({ report }: { report: ResearchReport }) { return <section className="card" aria-labelledby="report-heading"><h2 id="report-heading">Decision brief</h2><p className="muted">As of {report.as_of} · report version {report.version}</p><ul>{report.decision_brief.map((item, i) => <li key={i}>{item}</li>)}</ul><ReportSections key={report.id} report={report} /></section>; }
 
 function InfoCard({ title, value, detail }: { title: string; value: string; detail: string }) { return <section className="card"><h2>{title}</h2><p className="metric">{value}</p><p className="muted">{detail}</p></section>; }
 

@@ -159,3 +159,9 @@ for the audit/metrics APIs, optional local OpenTelemetry export, and privacy rul
 See [accessibility and responsive QA](docs/accessibility-qa.md) for keyboard
 behavior, browser checks (`make frontend-a11y`), completed checks, and remaining
 screen-reader sign-off.
+
+## Performance
+
+See [performance targets and profiling](docs/performance.md) for bounded caches,
+pagination, display-only chart aggregation, and reproducible offline benchmarks
+(`make performance`).

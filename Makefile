@@ -41,6 +41,11 @@ frontend-build:
 frontend-a11y:
 	npm --prefix frontend/web run test:a11y
 
+.PHONY: performance
+performance:
+	$(PYTHON) -m benchmarks.system
+	npm --prefix frontend/web run test:e2e -- performance.spec.ts
+
 check: lint format typecheck test frontend-lint frontend-test frontend-build
 
 .PHONY: kronos-benchmark

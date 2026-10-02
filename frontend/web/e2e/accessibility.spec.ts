@@ -64,6 +64,9 @@ test("keyboard skip link, route focus, validation and native evidence modal", as
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0); await expect(trigger).toBeFocused();
   await audit(page);
+  await page.getByRole("link", { name: "Calendar", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("main")).toBeFocused();
 });
 
 test("keyboard citations stay open to focus, dismiss, and expose exact links", async ({ page }) => {

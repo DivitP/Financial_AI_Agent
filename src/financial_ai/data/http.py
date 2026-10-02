@@ -4,10 +4,14 @@ from __future__ import annotations
 
 import email.utils
 import hashlib
+import json
 import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import Future
+from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Mapping
@@ -52,6 +56,8 @@ class SharedHttpClient:
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
         quotas=None,
+        cache_max_entries: int = 128,
+        cache_max_bytes: int = 16_000_000,
     ) -> None:
         if transport is None:
             from settings import get_settings
@@ -72,12 +78,16 @@ class SharedHttpClient:
         self.user_agent = user_agent
         self.sleep = sleep
         self.monotonic = monotonic
-        self._cache: dict[str, tuple[float, HttpResponse]] = {}
+        if cache_max_entries < 1 or cache_max_bytes < 1 or provider_concurrency < 1:
+            raise ValueError("Cache capacities and provider concurrency must be positive")
+        self.cache_max_entries, self.cache_max_bytes = cache_max_entries, cache_max_bytes
+        self._cache: OrderedDict[str, tuple[float, HttpResponse]] = OrderedDict()
         self._inflight: dict[str, Future[HttpResponse]] = {}
         self._semaphores: dict[str, threading.BoundedSemaphore] = {}
         self._lock = threading.Lock()
         self._cache_hits = 0
         self._cache_misses = 0
+        self._cache_bytes = self._evictions = self._deduplicated = 0
 
     def health_summary(self) -> dict:
         """Return aggregate counters only; never cache keys, URLs, headers or bodies."""
@@ -93,26 +103,41 @@ class SharedHttpClient:
                 "hits": self._cache_hits,
                 "misses": self._cache_misses,
                 "ttl_seconds": self.cache_ttl_seconds,
+                "bytes": self._cache_bytes,
+                "max_bytes": self.cache_max_bytes,
+                "evictions": self._evictions,
+                "deduplicated": self._deduplicated,
+                "hit_ratio": self._cache_hits / max(1, self._cache_hits + self._cache_misses),
             }
 
     def fetch(self, request: HttpRequest) -> HttpResponse:
         from financial_ai.observability import record_event
 
         key = self._cache_key(request)
+        hit = None
+        owner = False
+        future = None
         with self._lock:
             cached = self._cache.get(key)
             if cached and cached[0] > self.monotonic():
                 self._cache_hits += 1
-                record_event("cache", request.provider, "hit")
-                return cached[1]
-            future = self._inflight.get(key)
-            if future is None:
-                self._cache_misses += 1
-                future = Future()
-                self._inflight[key] = future
-                owner = True
+                self._cache.move_to_end(key)
+                hit = cached[1]
             else:
-                owner = False
+                if cached:
+                    self._cache_bytes -= len(self._cache.pop(key)[1].body)
+                future = self._inflight.get(key)
+                if future is None:
+                    self._cache_misses += 1
+                    future = Future()
+                    self._inflight[key] = future
+                    owner = True
+                else:
+                    self._deduplicated += 1
+        if hit is not None:
+            record_event("cache", request.provider, "hit")
+            return hit
+        assert future is not None
         if not owner:
             record_event("cache", request.provider, "deduplicated")
             return future.result(timeout=self.timeout_seconds * (self.max_retries + 1) + 30)
@@ -120,9 +145,20 @@ class SharedHttpClient:
         record_event("cache", request.provider, "miss")
         try:
             response = self._fetch_uncached(request)
-            if 200 <= response.status_code < 300:
+            if 200 <= response.status_code < 300 and len(response.body) <= self.cache_max_bytes:
                 with self._lock:
+                    for expired in [
+                        k for k, (expires, _) in self._cache.items() if expires <= self.monotonic()
+                    ]:
+                        self._cache_bytes -= len(self._cache.pop(expired)[1].body)
+                    while self._cache and (
+                        len(self._cache) >= self.cache_max_entries
+                        or self._cache_bytes + len(response.body) > self.cache_max_bytes
+                    ):
+                        self._cache_bytes -= len(self._cache.popitem(last=False)[1][1].body)
+                        self._evictions += 1
                     self._cache[key] = (self.monotonic() + self.cache_ttl_seconds, response)
+                    self._cache_bytes += len(response.body)
             future.set_result(response)
             return response
         except Exception as error:
@@ -206,16 +242,42 @@ class SharedHttpClient:
                 provider, threading.BoundedSemaphore(self.provider_concurrency)
             )
 
+    def fetch_many(self, requests: list[HttpRequest]) -> list[HttpResponse | Exception]:
+        """Bounded dispatch, coalesced duplicates, input order and independent failures.
+
+        This is not a claim that providers offer a bulk endpoint. Existing quotas,
+        concurrency, cache and retry policies apply to every distinct request.
+        """
+        if len(requests) > 50:
+            raise ValueError("A provider batch is limited to 50 requests")
+        with ThreadPoolExecutor(max_workers=min(8, self.provider_concurrency)) as pool:
+            futures: dict[str, Future] = {}
+            for request in requests:
+                key = self._cache_key(request)
+                if key not in futures:
+                    futures[key] = pool.submit(copy_context().run, self.fetch, request)
+            results: list[HttpResponse | Exception] = []
+            for request in requests:
+                try:
+                    results.append(futures[self._cache_key(request)].result())
+                except Exception as error:
+                    results.append(error)
+            return results
+
     @staticmethod
     def _cache_key(request: HttpRequest) -> str:
         digest = hashlib.sha256()
-        digest.update(request.provider.encode())
-        digest.update(request.method.encode())
-        digest.update(request.url.encode())
+        digest.update(
+            json.dumps(
+                [
+                    request.provider,
+                    request.method.upper(),
+                    request.url,
+                    sorted((key.lower(), value) for key, value in request.headers.items()),
+                ]
+            ).encode()
+        )
         digest.update(request.body or b"")
-        for key, value in sorted(request.headers.items()):
-            if key.lower() != "authorization":
-                digest.update(f"{key}:{value}".encode())
         return digest.hexdigest()
 
     @staticmethod

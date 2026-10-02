@@ -17,7 +17,7 @@ it("creates lists and edits ticker notes without starting research", async () =>
     return Promise.resolve({ ok: true, json: async () => path === "/api/v1/watchlists" ? init?.method === "POST" ? lists[0] : [...lists] : { ...lists[0], items: [...items] } });
   });
   render(<MemoryRouter initialEntries={["/watchlists"]}><QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><App /></QueryClientProvider></MemoryRouter>);
-  fireEvent.change(screen.getByLabelText("New watchlist name"), { target: { value: "Long term" } });
+  fireEvent.change(await screen.findByLabelText("New watchlist name"), { target: { value: "Long term" } });
   fireEvent.click(screen.getByRole("button", { name: "Create watchlist" }));
   await screen.findByRole("heading", { name: "Long term" });
   fireEvent.change(screen.getByLabelText("Ticker"), { target: { value: "aapl" } });

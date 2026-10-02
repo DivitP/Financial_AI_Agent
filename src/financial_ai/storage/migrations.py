@@ -394,6 +394,31 @@ def _downgrade_0013(connection: sqlite3.Connection) -> None:
     connection.execute("DROP TABLE telemetry_events")
 
 
+def _upgrade_0014(connection: sqlite3.Connection) -> None:
+    connection.execute("DROP INDEX idx_research_snapshots_run_id")
+    connection.execute(
+        "ALTER TABLE research_snapshots ADD COLUMN revision INTEGER NOT NULL DEFAULT 1"
+    )
+    connection.execute("CREATE INDEX idx_snapshots_run_page ON research_snapshots(run_id, id)")
+    connection.execute("CREATE INDEX idx_jobs_run ON jobs(run_id)")
+    connection.execute("CREATE INDEX idx_qa_run_page ON qa_history(run_id, id)")
+    connection.execute(
+        "CREATE INDEX idx_requests_provider_time ON provider_requests(provider, requested_at)"
+    )
+
+
+def _downgrade_0014(connection: sqlite3.Connection) -> None:
+    for index in (
+        "idx_snapshots_run_page",
+        "idx_jobs_run",
+        "idx_qa_run_page",
+        "idx_requests_provider_time",
+    ):
+        connection.execute(f"DROP INDEX {index}")
+    connection.execute("ALTER TABLE research_snapshots DROP COLUMN revision")
+    connection.execute("CREATE INDEX idx_research_snapshots_run_id ON research_snapshots(run_id)")
+
+
 MIGRATIONS = (
     Migration(1, "initial_research_schema", _upgrade_0001, _downgrade_0001),
     Migration(2, "durable_job_progress", _upgrade_0002, _downgrade_0002),
@@ -408,4 +433,5 @@ MIGRATIONS = (
     Migration(11, "durable_quotas", _upgrade_0011, _downgrade_0011),
     Migration(12, "redis_job_outbox", _upgrade_0012, _downgrade_0012),
     Migration(13, "run_observability", _upgrade_0013, _downgrade_0013),
+    Migration(14, "bounded_snapshot_reads", _upgrade_0014, _downgrade_0014),
 )
