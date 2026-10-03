@@ -3,7 +3,9 @@
 import argparse
 import importlib
 import logging
+import os
 import time
+from pathlib import Path
 from contextlib import contextmanager
 from uuid import UUID, uuid4
 
@@ -145,9 +147,15 @@ def main():
     tracer_provider()
     TelemetryStore(database).cleanup(settings.telemetry_retention_days)
     runner = RedisResearchJobRunner(database, settings)
+    heartbeat_path = os.environ.get("WORKER_HEARTBEAT_PATH")
+    heartbeat = Path(heartbeat_path) if heartbeat_path else None
+    if heartbeat:
+        heartbeat.unlink(missing_ok=True)
     while True:
         try:
             runner.process_one(factory)
+            if heartbeat:
+                heartbeat.touch()
         except Exception:
             logging.getLogger(__name__).warning("Worker dependency unavailable; retrying safely")
             if args.once:

@@ -70,6 +70,7 @@ sentiment = [
 
 [dependency-groups]
 dev = [
+    "pyyaml>=6,<7",
     "coverage[toml]>=7.6,<8",
     "pre-commit>=4.0,<5",
     "mypy>=1.14,<2",

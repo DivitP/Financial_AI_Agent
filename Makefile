@@ -52,6 +52,16 @@ check: lint format typecheck test frontend-lint frontend-test frontend-build
 release-eval:
 	$(PYTHON) -m benchmarks.release
 
+.PHONY: local-up local-down local-smoke
+local-up:
+	docker compose up --build --detach --wait --wait-timeout 180
+
+local-down:
+	docker compose down
+
+local-smoke:
+	docker compose exec -T api python -m financial_ai.ops smoke
+
 .PHONY: kronos-benchmark
 kronos-benchmark:
 	$(PYTHON) -m pytest benchmarks/kronos --no-cov -q

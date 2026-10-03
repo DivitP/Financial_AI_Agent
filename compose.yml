@@ -1,0 +1,109 @@
+name: financial-ai-local
+
+x-app: &app
+  build: .
+  image: financial-ai-local:dev
+  init: true
+  user: "10001:10001"
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  environment: &environment
+    DEPLOYMENT_PROFILE: scaled
+    DATABASE_URL: postgresql://research:local-demo-only@postgres:5432/research
+    REDIS_URL: redis://redis:6379/0
+    FINANCIAL_AI_PERSIST_DIR: /app/data/runtime
+    FINANCIAL_AI_APP_ENVIRONMENT: production
+    FINANCIAL_AI_DEBUG: "false"
+    ALLOWED_HOSTS: '["localhost","127.0.0.1","api"]'
+    ALLOWED_BROWSER_ORIGINS: '["http://localhost:8080","http://127.0.0.1:8080"]'
+    WORKER_HANDLER_FACTORY: financial_ai.workflow.demo:handler
+    ENABLE_GROQ: "false"
+    ENABLE_FMP: "false"
+    ENABLE_LOCAL_LLM: "false"
+    ENABLE_KRONOS: "false"
+    KRONOS_CACHE_DIR: /app/model-cache/kronos
+    HF_HOME: /app/model-cache/huggingface
+    WORKER_HEARTBEAT_PATH: /tmp/worker-heartbeat
+  volumes:
+    - runtime:/app/data/runtime
+    - model-cache:/app/model-cache
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+
+services:
+  postgres:
+    image: postgres:17.11
+    user: postgres
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    environment:
+      POSTGRES_DB: research
+      POSTGRES_USER: research
+      POSTGRES_PASSWORD: local-demo-only
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "research", "-d", "research"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:8.2.1
+    user: redis
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes: ["redis:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  api:
+    <<: *app
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+  worker:
+    <<: *app
+    command: ["python", "-m", "financial_ai.workflow.redis_worker"]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "financial_ai.ops", "worker-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    init: true
+    user: nginx
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  postgres:
+  redis:
+  runtime:
+  model-cache:

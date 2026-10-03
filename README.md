@@ -170,3 +170,9 @@ pagination, display-only chart aggregation, and reproducible offline benchmarks
 
 Run `make release-eval` to produce offline release-quality reports, test logs and
 desktop/mobile browser screenshots. See [release gates and review requirements](docs/release-evaluation.md).
+
+## Local containers
+
+Run `docker compose up --build --detach --wait` and open http://localhost:8080.
+The default is a clearly labelled offline demo with persistent storage, not live
+financial research. See [local Compose setup and verification](docs/local-compose.md).
