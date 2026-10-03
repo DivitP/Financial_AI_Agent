@@ -290,6 +290,9 @@ evidence, pending-job recovery and exports before any intentional production swi
 
 ## 6. Migrations, upgrades and rollback
 
+For old Flask/vectorstore data, use [legacy archive and quarantine migration](legacy-migration.md)
+before upgrading. Uncited legacy reports must never become verified evidence.
+
 1. Record revision and selected extras; stop all writers and take a tested backup.
 2. Install with the new committed locks or rebuild images. Do not edit the lockfile
    on the deployment host to make an incompatible install succeed.
