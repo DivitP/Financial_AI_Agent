@@ -173,6 +173,9 @@ desktop/mobile browser screenshots. See [release gates and review requirements](
 
 ## Local containers
 
+Start with the [free-first deployment and operations guide](docs/deployment.md)
+for local setup, provider configuration, backups, upgrades and troubleshooting.
+
 Run `docker compose up --build --detach --wait` and open http://localhost:8080.
 The default is a clearly labelled offline demo with persistent storage, not live
 financial research. See [local Compose setup and verification](docs/local-compose.md).
