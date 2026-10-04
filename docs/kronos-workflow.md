@@ -14,11 +14,12 @@ persisted and before marking the run complete. It can also accept an injected
 when the optional node fails. No forecast is a prerequisite for a report or LLM
 analysis; experimental forecasts are not silently added to report evidence.
 
-The repository currently exposes collection through this workflow abstraction,
-not a production live-provider scheduler. Merely creating a research run does not
-start collection. Run your configured collection worker as before. The existing
-generic job runner's placeholder collect/analyze/report steps are not live data
-collectors; this feature does not invent missing market inputs.
+The optional node is wired into `InitialResearchWorkflow`, separately from the
+initial live `ResearchPipeline` factory. Creating a run only queues work; run an
+explicit worker. The initial live factory collects adjusted closes, not the full
+input contract below, so it cannot yet produce this forecast. See the
+[replacement integration gates](replacement-workflow.md). Enabling Kronos does
+not invent missing market inputs or automatically connect the two workflows.
 
 ## Required collector contract
 

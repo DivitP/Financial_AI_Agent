@@ -1,5 +1,9 @@
 # Release candidate evaluation
 
+Use the [release checklist](release-checklist.md) for human sign-off and
+[screenshot guide](screenshots.md) for capture labels and visual review.
+Passing this command is an engineering gate, not approval of live research.
+
 After `uv sync --locked --all-groups`, `npm --prefix frontend/web ci`, and
 `cd frontend/web && npx playwright install chromium`, run from the repository root:
 
