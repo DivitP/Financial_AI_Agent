@@ -175,6 +175,8 @@ class LocalResearchJobRunner:
                     with observe("node", lane):
                         self.quotas.charge("calls")
                         handler(lane)
+                if self._is_cancelled(job_id):
+                    return self._job(job_id)
                 with self.database.transaction() as connection:
                     run_status = connection.execute(
                         "SELECT status FROM research_runs WHERE id=?", (str(row["run_id"]),)

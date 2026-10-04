@@ -27,8 +27,29 @@ def test_invalid_request_is_safe_json_with_correlation_id(tmp_path) -> None:
     assert "traceback" not in response.text.lower()
 
 
+def test_unconfigured_execution_cannot_succeed_without_collecting(tmp_path) -> None:
+    app = create_app(tmp_path / "api.db")
+    app.state.handler_factory = None
+    client = TestClient(app)
+    job = client.post("/api/v1/research-jobs", json={"ticker": "AAPL"}).json()
+    response = client.post(f"/api/v1/research-jobs/{job['id']}/run")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "research_worker_unconfigured"
+    with app.state.database.connect() as connection:
+        assert (
+            connection.execute("SELECT status FROM jobs WHERE id=?", (job["id"],)).fetchone()[
+                "status"
+            ]
+            == "pending"
+        )
+
+
 def test_job_events_resume_after_last_event_id_without_duplicates(tmp_path) -> None:
-    client = TestClient(create_app(tmp_path / "api.db"))
+    app = create_app(tmp_path / "api.db")
+    from financial_ai.workflow.demo import handler
+
+    app.state.handler_factory = handler
+    client = TestClient(app)
     created = client.post("/api/v1/research-jobs", json={"ticker": "AAPL"}).json()
     job_id = created["id"]
     assert client.post(f"/api/v1/research-jobs/{job_id}/run").json()["status"] == "completed"

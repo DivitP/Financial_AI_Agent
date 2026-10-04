@@ -8,6 +8,11 @@ education; it must not present personalized investment advice or place trades.
 
 ## Current layout
 
+- `src/financial_ai/` contains the replacement API, providers, analysis, storage,
+  retrieval, and durable workflows.
+- `frontend/web/` contains the React client.
+- `src/financial_ai/workflow/local_worker.py` runs the explicit local worker;
+  see `docs/replacement-workflow.md` for configuration and retirement gates.
 - `main.py` contains the legacy orchestration and lightweight retrieval store.
 - `agents/` contains legacy research, fundamental, and technical modules.
 - `frontend/app.py` is the legacy Flask interface.
@@ -17,6 +22,10 @@ education; it must not present personalized investment advice or place trades.
 Keep new application code modular. Do not add new product logic to the inline
 HTML string in `frontend/app.py`; the future web client belongs in its own
 frontend package.
+
+Do not remove the legacy implementation until the replacement's documented
+parity and live-validation gates pass. Offline fixture success alone is not
+proof of live-provider coverage.
 
 ## Setup and commands
 

@@ -58,6 +58,9 @@ def test_snapshot_cache_revision_pagination_compression_and_streams(tmp_path):
     assert updated.headers["etag"] != first.headers["etag"]
     repo.upsert_snapshot(run_id, "kronos", "completed", {})
     assert client.get(path).headers["cache-control"] == "no-store"
+    from financial_ai.workflow.demo import handler
+
+    app.state.handler_factory = handler
     client.post(f"/api/v1/research-jobs/{created['id']}/run")
     stream = client.get(
         f"/api/v1/research-jobs/{created['id']}/events", headers={"Accept-Encoding": "gzip"}

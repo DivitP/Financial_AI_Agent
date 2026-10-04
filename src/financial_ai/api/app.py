@@ -136,6 +136,16 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
     app.include_router(watchlist_router(Watchlists(database)))
     app.state.repository = repository
     app.state.runner = runner
+    from financial_ai.workflow.pipeline import handler as research_handler
+    from financial_ai.workflow.redis_worker import load_handler
+
+    app.state.handler_factory = (
+        load_handler(settings.worker_handler_factory)
+        if settings.worker_handler_factory
+        else research_handler
+        if settings.enable_live_research
+        else None
+    )
     app.state.kronos = KronosWorkflowNode(repository, get_settings())
     from financial_ai.api.snapshots import SnapshotReader
     from starlette.middleware.gzip import GZipMiddleware
@@ -464,7 +474,17 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
     @app.post("/api/v1/research-jobs/{job_id}/run", response_model=JobResponse, tags=["research"])
     def run_research_job(job_id: UUID, request: Request) -> JobResponse:
         try:
-            job = runner.run(job_id)
+            if settings.deployment_profile == "scaled":
+                job = runner.run(job_id)
+            else:
+                factory = app.state.handler_factory
+                if factory is None:
+                    raise ApiError(
+                        "research_worker_unconfigured",
+                        "Configure a research worker; no collection was executed.",
+                        503,
+                    )
+                job = runner.run(job_id, factory(repository, runner._job(job_id).run_id))
         except KeyError as error:
             raise ApiError("job_not_found", "Research job was not found.", 404) from error
         return _job_response(job, request.state.correlation_id)

@@ -13,10 +13,12 @@ limits before enabling live calls.
 | --- | --- | --- |
 | Local development | Git, Python 3.12/3.13, uv, Node 22/npm | SQLite API, React UI, offline tests; no automatic live worker |
 | Local Compose demo | Docker with Compose v2 | Web, API, Redis worker, Postgres; explicitly synthetic demo data |
-| Scaled self-hosting | Own hardware, same containers, trusted worker factory | Shared jobs/storage; live collection requires assembling and validating the worker integration |
+| Scaled self-hosting | Own hardware, same containers, trusted worker factory | Shared jobs/storage; the initial live factory requires explicit configuration and validation |
 
-There is **not yet a bundled end-to-end live research worker**. Provider adapters,
-analysis nodes and APIs exist, but adding FMP/Groq keys does not wire them together.
+There is now a bounded initial [replacement worker](replacement-workflow.md), but
+full legacy feature parity and live-provider validation are not yet established.
+Adding FMP/Groq keys alone does not enable collection; configure the explicit
+worker factory, live opt-in, SEC contact and approved feeds described there.
 Do not describe a demo or an API health response as verified live financial research.
 There is no brokerage or trading execution in these deployment paths.
 
@@ -179,11 +181,13 @@ There is no turnkey embedding-download or index-rebuild CLI yet.
 The default `compose.yml` already exercises Postgres/Redis, but only with the demo
 handler. The separate `compose.scale.yml` is an advanced API/worker profile:
 
-1. Implement/test a trusted packaged `module:function(repository, run_id)` factory
+1. Configure/test a trusted packaged `module:function(repository, run_id)` factory
    returning a synchronous step handler for `collect`, `analyze`, `report`.
    Keep calls bounded/idempotent, persist evidence before findings, and raise or
    record failed research when required collection fails. Start with
    `financial_ai.workflow.demo:handler` **only** to verify infrastructure.
+   The bounded live factory is `financial_ai.workflow.pipeline:handler`; review
+   its configuration and remaining limitations in [replacement workflow](replacement-workflow.md).
 2. In the launching shell, set `POSTGRES_PASSWORD` to a new locally managed secret
    (URL-encode it in a connection URI if needed) and `WORKER_HANDLER_FACTORY` to
    that trusted factory. The advanced file interpolates the password into its URI;

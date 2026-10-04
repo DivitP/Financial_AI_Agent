@@ -1,4 +1,5 @@
 import { ReportSections } from "./ReportSections";
+import { PriceHistory } from "./PriceHistory";
 import { Navigation, RouteAccessibility, EvidenceDialog } from "./Accessibility";
 import { safeExternalUrl } from "./security";
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -43,17 +44,18 @@ function ResearchDashboard() {
   const { runId = "" } = useParams(); const client = useQueryClient(); const [streamState, setStreamState] = useState("Connecting to progress updates…");
   const run = useQuery({ queryKey: ["run", runId], queryFn: () => researchApi.get(runId), refetchInterval: (query) => active(query.state.data?.status) ? 2_000 : false });
   const snapshots = useQuery({ queryKey: ["snapshots", runId], queryFn: () => researchApi.snapshots(runId), refetchInterval: () => active(run.data?.status) ? 2_000 : false });
-  const report = useQuery({ queryKey: ["report", runId], queryFn: () => researchApi.report(runId), enabled: run.data?.status === "completed", retry: false });
+  const report = useQuery({ queryKey: ["report", runId], queryFn: () => researchApi.report(runId), enabled: ["completed", "failed"].includes(run.data?.status ?? ""), retry: false });
   const cancel = useMutation({ mutationFn: () => researchApi.cancel(runId), onSuccess: () => client.invalidateQueries({ queryKey: ["run", runId] }) });
   const retry = useMutation({ mutationFn: () => researchApi.retry(runId), onSuccess: () => { client.invalidateQueries({ queryKey: ["run", runId] }); client.invalidateQueries({ queryKey: ["snapshots", runId] }); } });
   useEffect(() => { if (!runId) return; const source = subscribeToRun(runId, () => { setStreamState("Live progress connected"); client.invalidateQueries({ queryKey: ["run", runId] }); client.invalidateQueries({ queryKey: ["snapshots", runId] }); }, () => setStreamState("Reconnecting to progress updates…")); return () => source.close(); }, [client, runId]);
   if (run.isLoading) return <Shell><main id="main-content" tabIndex={-1}><Loading /></main></Shell>; if (run.error || !run.data) return <Shell><main id="main-content" tabIndex={-1}><ErrorNotice error={run.error as ApiFailure} /></main></Shell>;
   return <Shell><main id="main-content" tabIndex={-1}><Link to="/" className="back-link">← New research</Link><header className="run-header"><div><p className="eyebrow">Research run</p><h1>{run.data.ticker}</h1><p className="muted" role="status">{streamState} · Run {run.data.status}</p></div><Status status={run.data.status} /></header>
     <Progress snapshots={snapshots.data ?? []} status={run.data.status} />
+    <PriceHistory snapshots={snapshots.data ?? []} />
     <p><Link to={`/runs/${runId}/forecast`}>Forecast research and model card →</Link></p>
     <ResearchChat key={runId} runId={runId} />
     {(cancel.error || retry.error) && <ErrorNotice error={(cancel.error || retry.error) as ApiFailure} />}<div className="actions">{active(run.data.status) && <button className="secondary" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel run</button>}{["failed", "cancelled"].includes(run.data.status) && <button onClick={() => retry.mutate()} disabled={retry.isPending}>Retry research</button>}</div>
-    {run.data.status === "completed" && <Overview snapshots={snapshots.data ?? []} ticker={run.data.ticker} assetType={run.data.asset_type ?? "equity"} report={report.data} />}{snapshots.error && <ErrorNotice error={snapshots.error as ApiFailure} />}
+    {["completed", "failed"].includes(run.data.status) && <Overview snapshots={snapshots.data ?? []} ticker={run.data.ticker} assetType={run.data.asset_type ?? "equity"} report={report.data} />}{snapshots.error && <ErrorNotice error={snapshots.error as ApiFailure} />}
   </main></Shell>;
 }
 

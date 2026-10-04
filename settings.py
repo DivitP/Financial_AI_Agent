@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     host: str = Field(default="127.0.0.1", validation_alias="FINANCIAL_AI_HOST")
     port: int = Field(default=8501, ge=1, le=65535, validation_alias="PORT")
     debug: bool = Field(default=False, validation_alias="FINANCIAL_AI_DEBUG")
+    enable_live_research: bool = False
+    sec_user_agent: str = ""
+    research_news_feeds: list[str] = Field(default_factory=list)
     telemetry_export_enabled: bool = False
     telemetry_retention_days: int = Field(default=7, ge=1, le=90)
     allowed_browser_origins: list[str] = Field(
@@ -144,6 +147,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_enabled_providers(self) -> "Settings":
+        if self.enable_live_research and (
+            "@" not in self.sec_user_agent or len(self.sec_user_agent) < 10
+        ):
+            raise ValueError(
+                "Live research requires SEC_USER_AGENT with your application name and contact email."
+            )
         if self.deployment_profile == "scaled":
             if not self.database_url or not self.database_url.get_secret_value().startswith(
                 ("postgresql://", "postgres://")
