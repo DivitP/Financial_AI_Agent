@@ -24,6 +24,10 @@ There is no brokerage or trading execution in these deployment paths.
 
 ## 1. Local-only setup
 
+The pinned defaults are Python 3.12.13 and Node 22.14.0 with npm 10; Python 3.13
+is also supported. Select Node with `.nvmrc` and let uv read `.python-version`.
+See [runtime selection](development-runtimes.md) before installing dependencies.
+
 Install Git, Python 3.12/3.13, Node 22 (includes npm), and uv using their official
 installers: [uv](https://docs.astral.sh/uv/getting-started/installation/),
 [Node](https://nodejs.org/en/download). Reopen the terminal after installation.

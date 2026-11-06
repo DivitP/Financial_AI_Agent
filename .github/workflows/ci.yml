@@ -11,6 +11,12 @@ jobs:
   quality:
     name: Python quality and legacy checks
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12.13", "3.13"]
+    env:
+      UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v7
@@ -18,10 +24,10 @@ jobs:
           version: "0.12.4"
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/web/package-lock.json
       - name: Install locked development dependencies
@@ -79,7 +85,7 @@ jobs:
           version: "0.12.4"
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
       - run: uv sync --locked --all-groups --extra scale
       - run: uv run pytest tests/test_deployment_profiles.py --no-cov
 

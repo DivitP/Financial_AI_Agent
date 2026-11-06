@@ -29,10 +29,14 @@ proof of live-provider coverage.
 
 ## Setup and commands
 
-Use Python 3.12 or 3.13 and `uv` for local development.
+Use Python 3.12 or 3.13 and `uv` for local development. The default is Python
+3.12.13 (`.python-version`); Node 22.14.0 (`.nvmrc`) with npm 10 is the frontend
+baseline. Node 22 from 22.14.0 onward is supported; Node 20/24/26 and Python
+3.11/3.14 are outside the declared development contract. See
+`docs/development-runtimes.md` for overrides and verification.
 
 ```bash
-uv sync --all-groups
+uv sync --locked --all-groups
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .

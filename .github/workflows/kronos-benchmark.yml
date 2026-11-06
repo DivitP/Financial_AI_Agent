@@ -19,7 +19,7 @@ jobs:
           version: "0.12.4"
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version-file: .python-version
       - run: uv sync --locked --all-groups
       - name: Offline suite and deliberate-regression checks
         run: uv run pytest benchmarks/kronos --no-cov -q

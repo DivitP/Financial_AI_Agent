@@ -38,6 +38,9 @@ clean-machine smoke result; this README does not assert one was run.
 
 Install uv and Node/npm first if your shell reports `command not found`; see the
 [prerequisites guide](docs/deployment.md#1-local-only-setup).
+Use Python 3.12.13 by default (`.python-version`) or supported Python 3.13, and
+Node 22.14.0 (`.nvmrc`) with npm 10. With nvm, run `nvm install` and `nvm use`
+from the root. See [runtime selection and verification](docs/development-runtimes.md).
 From the repository root:
 
 ```bash

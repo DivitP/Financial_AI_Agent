@@ -9,6 +9,12 @@ from types import ModuleType
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def disable_legacy_dotenv_discovery(monkeypatch):
+    """Legacy imports must not discover a developer .env through stack frames."""
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
+
+
 @pytest.fixture
 def isolated_budget(tmp_path):
     """Provider fixture calls use real quotas in a fresh database, not developer state."""
