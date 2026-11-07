@@ -20,6 +20,11 @@ typecheck:
 
 test:
 	$(PYTHON) -m pytest
+	$(PYTHON) -m benchmarks.coverage
+
+.PHONY: coverage-report
+coverage-report:
+	$(PYTHON) -m benchmarks.coverage
 
 .PHONY: rag-eval
 rag-eval:

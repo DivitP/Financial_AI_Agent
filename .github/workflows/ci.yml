@@ -38,8 +38,16 @@ jobs:
         run: uv run ruff format --check .
       - name: Type check
         run: uv run mypy
-      - name: Run offline characterization tests
-        run: uv run pytest
+      - name: Run offline tests and gate replacement coverage
+        run: make test
+      - name: Preserve split coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-python-${{ matrix.python }}
+          path: data/runtime/coverage/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Gate offline RAG evaluation thresholds
         run: make rag-eval
       - name: Install locked frontend dependencies

@@ -100,6 +100,11 @@ def main():
                 require_scaled=bool(env.get("TEST_POSTGRES_URL") or env.get("TEST_REDIS_URL")),
             ),
         ),
+        (
+            "coverage",
+            [python, "-m", "benchmarks.coverage", "--output", str(output / "coverage")],
+            None,
+        ),
         ("frontend", ["make", "frontend-lint", "frontend-test", "frontend-build"], None),
         ("performance", [python, "-m", "benchmarks.system"], None),
         (
@@ -123,6 +128,12 @@ def main():
     results = []
     for name, command, validate in stages:
         print(f"Release gate: {name}", flush=True)
+        if (
+            name == "coverage"
+            and next(r for r in results if r["name"] == "python")["status"] != "passed"
+        ):
+            results.append({"name": name, "status": "blocked", "seconds": 0, "log": None})
+            continue
         if (
             name == "browser"
             and next(r for r in results if r["name"] == "frontend")["status"] != "passed"

@@ -194,7 +194,9 @@ make release-eval
 ```
 
 `make check` runs lint, format, typing, Python/frontend tests and the production
-build. `make release-eval` additionally produces quality reports, performance
+build, including the [replacement coverage gate](docs/coverage.md). Coverage
+reports separate replacement, legacy and shared settings; replacement floors are
+87% lines and 69% branches. `make release-eval` additionally produces quality reports, performance
 results and browser captures under `data/runtime/release/<timestamp-id>/`.
 Fixtures require no API keys or live financial requests. Dependency/browser
 installation requires downloads. Scaled services, real Kronos weights, live

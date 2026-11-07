@@ -97,6 +97,10 @@ provider calls as part of automated tests.
 A change is complete only when it includes focused tests, documentation for
 user-visible behavior, and all applicable checks pass:
 
+`make test` runs the full Python suite and replacement-only coverage gates (87%
+lines, 69% branches). See `docs/coverage.md` for the measured baseline and split
+reports; do not lower floors or exclude application modules to hide regressions.
+
 ```bash
 make check
 ```

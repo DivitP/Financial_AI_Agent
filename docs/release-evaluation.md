@@ -20,6 +20,9 @@ artifacts: review for sensitive information before sharing; never commit them.
 
 ## Mandatory automated thresholds
 
+- [Replacement coverage](coverage.md): at least 87% lines and 69% branches;
+  legacy and shared-settings coverage reported separately, without blending totals.
+
 - Ruff, formatting, mypy, frontend types, unit tests and production build: zero failures.
 - Full Python suite: zero failures and all 12 corpus evaluations present. Only
   the six real-service deployment tests may skip when services are unconfigured.

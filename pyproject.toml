@@ -85,19 +85,25 @@ package = true
 default-groups = ["dev"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --cov=agents --cov=frontend --cov=main --cov=settings --cov-report=term-missing"
+addopts = "-ra --strict-markers --cov --cov-report=term-missing"
 pythonpath = [".", "src"]
 testpaths = ["tests"]
 markers = ["kronos_benchmark: explicit standalone Kronos benchmark suite (outside fast testpaths)"]
 
 [tool.coverage.run]
 branch = true
-source = ["agents", "frontend", "main", "settings"]
+source = ["financial_ai", "agents", "frontend", "main", "settings"]
 omit = ["tests/*"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
+precision = 2
+
+[tool.financial-ai.coverage]
+# Replacement-only floors measured against the base offline suite; see docs/coverage.md.
+lines = 87.0
+branches = 69.0
 
 [tool.ruff]
 target-version = "py312"

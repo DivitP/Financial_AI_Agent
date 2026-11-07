@@ -10,6 +10,9 @@ This documentation change does not declare a release ready.
 - [ ] From a clean checkout, install with `uv sync --locked --all-groups` and
   `npm --prefix frontend/web ci`; record Python, uv, Node/npm and OS versions.
 - [ ] Run `make check` and `git diff --check`; retain results.
+- [ ] Review [split coverage](coverage.md) reports: replacement must meet 87%
+  lines and 69% branches independently. Retain legacy/shared-setting measurements
+  separately and investigate per-file gaps rather than blending totals.
 - [ ] Install Chromium using the README command, then run `make release-eval`.
   Attach the reviewed `quality.md`/`quality.json`, revision and exclusions.
   Use the exact thresholds in [release evaluation](release-evaluation.md), not
