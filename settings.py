@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     port: int = Field(default=8501, ge=1, le=65535, validation_alias="PORT")
     debug: bool = Field(default=False, validation_alias="FINANCIAL_AI_DEBUG")
     enable_live_research: bool = False
+    synthetic_evidence_origin: str = "http://localhost:8000"
+
+    @field_validator("synthetic_evidence_origin")
+    @classmethod
+    def valid_synthetic_origin(cls, value: str) -> str:
+        from financial_ai.providers.synthetic import SyntheticCollector
+
+        return SyntheticCollector(value).base_url
+
     sec_user_agent: str = ""
     research_news_feeds: list[str] = Field(default_factory=list)
     telemetry_export_enabled: bool = False

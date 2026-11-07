@@ -23,7 +23,15 @@ TAGS = {
 
 
 def financial_periods(facts):
-    annual = [f for f in facts if f["unit"] == "USD" and f["form"] in {"10-K", "10-K/A"}]
+    annual = [
+        f
+        for f in facts
+        if f["unit"] == "USD"
+        and (
+            f["form"] in {"10-K", "10-K/A"}
+            or (f["form"] == "SYNTHETIC-ANNUAL" and f.get("synthetic") is True)
+        )
+    ]
     duration = [
         f
         for f in annual

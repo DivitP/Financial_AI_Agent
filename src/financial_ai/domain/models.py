@@ -48,6 +48,7 @@ class QualitySeverity(str, Enum):
 
 
 class SourceTier(str, Enum):
+    SYNTHETIC = "synthetic"
     PRIMARY = "primary"
     OFFICIAL = "official"
     REPUTABLE = "reputable"

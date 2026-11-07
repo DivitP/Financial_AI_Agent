@@ -1,5 +1,6 @@
 import { ReportSections } from "./ReportSections";
 import { PriceHistory } from "./PriceHistory";
+import { SyntheticNotice } from "./SyntheticNotice";
 import { Navigation, RouteAccessibility, EvidenceDialog } from "./Accessibility";
 import { safeExternalUrl } from "./security";
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
@@ -51,6 +52,7 @@ function ResearchDashboard() {
   if (run.isLoading) return <Shell><main id="main-content" tabIndex={-1}><Loading /></main></Shell>; if (run.error || !run.data) return <Shell><main id="main-content" tabIndex={-1}><ErrorNotice error={run.error as ApiFailure} /></main></Shell>;
   return <Shell><main id="main-content" tabIndex={-1}><Link to="/" className="back-link">← New research</Link><header className="run-header"><div><p className="eyebrow">Research run</p><h1>{run.data.ticker}</h1><p className="muted" role="status">{streamState} · Run {run.data.status}</p></div><Status status={run.data.status} /></header>
     <Progress snapshots={snapshots.data ?? []} status={run.data.status} />
+    <SyntheticNotice snapshots={snapshots.data ?? []} />
     <PriceHistory snapshots={snapshots.data ?? []} />
     <p><Link to={`/runs/${runId}/forecast`}>Forecast research and model card →</Link></p>
     <ResearchChat key={runId} runId={runId} />

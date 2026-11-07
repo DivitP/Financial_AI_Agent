@@ -48,6 +48,7 @@ from financial_ai.api.portfolio import portfolio_router
 from financial_ai.api.calendar import calendar_router
 from financial_ai.api.exports import export_router
 from financial_ai.api.console import console_router
+from financial_ai.api.synthetic import synthetic_router
 from financial_ai.analysis.delta import ResearchDelta
 from financial_ai.storage.watchlists import Watchlists
 from financial_ai.api.watchlists import watchlist_router
@@ -129,6 +130,7 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
         return response
 
     app.include_router(console_router(database, get_settings()))
+    app.include_router(synthetic_router(get_settings().synthetic_evidence_origin))
     app.include_router(comparison_router(database))
     app.include_router(portfolio_router(database))
     app.include_router(calendar_router(database))

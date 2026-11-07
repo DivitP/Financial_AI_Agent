@@ -115,7 +115,9 @@ class ResearchPipeline:
                         excerpt=text,
                         raw_artifact_id=artifact,
                         exact_url=source.url,
-                        source_tier=SourceTier.OFFICIAL
+                        source_tier=SourceTier.SYNTHETIC
+                        if source.payload.get("synthetic") is True
+                        else SourceTier.OFFICIAL
                         if source.provider == "sec"
                         else SourceTier.REPUTABLE,
                     )
@@ -183,6 +185,7 @@ class ResearchPipeline:
                     "limitations": [
                         "Latest-filed annual USD facts only; missing metrics are not estimated."
                     ],
+                    "synthetic": data.get("synthetic", False),
                 },
             )
         row = rows.get("ohlcv")
@@ -203,6 +206,7 @@ class ResearchPipeline:
                     "limitations": [
                         "Descriptive historical indicators, not a trading signal or forecast."
                     ],
+                    "synthetic": payload.get("synthetic", False),
                 },
             )
 
@@ -224,6 +228,11 @@ class ResearchPipeline:
                 summary=row["excerpt"][:1500],
                 evidence_ids=[ident],
                 limitations=["Extractive source summary; not personalized investment advice."]
+                + (
+                    ["SYNTHETIC SAMPLE: invented data, not real financial evidence."]
+                    if row["source_tier"] == "synthetic"
+                    else []
+                )
                 + (["Unavailable lanes: " + ", ".join(failures)] if failures else []),
             )
             sections.setdefault(row["locator"], []).append(finding)
@@ -240,7 +249,8 @@ class ResearchPipeline:
                 )
             sections[row["lane"]] = [
                 AgentFinding(
-                    summary=summary,
+                    summary=("SYNTHETIC SAMPLE — invented data. " if data.get("synthetic") else "")
+                    + summary,
                     evidence_ids=[UUID(data["evidence_id"])],
                     limitations=data["limitations"],
                 )
