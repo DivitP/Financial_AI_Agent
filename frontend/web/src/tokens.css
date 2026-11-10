@@ -1,0 +1,42 @@
+/* Shared workspace primitives. No remote fonts or decorative effects. */
+:root {
+  --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-section: 1.125rem;
+  --text-title: 1.75rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --surface-page: #f5f6f8;
+  --surface-card: #ffffff;
+  --surface-muted: #edf0f4;
+  --text: #202936;
+  --text-muted: #536174;
+  --border: #d6dce4;
+  --border-control: #8996a8;
+  --accent: #245ca4;
+  --accent-hover: #19467f;
+  --on-accent: #ffffff;
+  --focus: #245ca4;
+  --status-success: #196442;
+  --status-success-bg: #e8f3ec;
+  --status-warning: #805700;
+  --status-warning-bg: #fff4d8;
+  --status-danger: #a12727;
+  --status-danger-bg: #fcecec;
+  --radius: 6px;
+  --chart-surface: var(--surface-card);
+  --chart-text: var(--text-muted);
+  --chart-grid: var(--border);
+  --chart-line: var(--accent);
+  --chart-up: var(--status-success);
+  --chart-down: var(--status-danger);
+  --chart-band-outer: #e1ebf7;
+  --chart-band-inner: #a9c3e4;
+}

@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "vite --config vite.config.ts",
     "build": "tsc -b && vite build --config vite.config.ts",
-    "lint": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "format": "prettier --write src e2e *.ts *.json index.html",
+    "format:check": "prettier --check src e2e *.ts *.json index.html",
+    "lint": "npm run format:check && tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run --config vite.config.ts",
     "test:watch": "vitest --config vite.config.ts",
     "test:e2e": "playwright test",
@@ -32,6 +34,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "axe-core": "^4.10.2",
     "jsdom": "^25.0.1",
+    "prettier": "3.6.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.5"

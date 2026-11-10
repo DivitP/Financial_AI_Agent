@@ -6,85 +6,656 @@ import { safeExternalUrl } from "./security";
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
-import { ApiFailure, researchApi, ResearchReport, ResearchRequest, ResearchSnapshot, subscribeToRun } from "./api";
+import {
+  ApiFailure,
+  researchApi,
+  ResearchReport,
+  ResearchRequest,
+  ResearchSnapshot,
+  subscribeToRun,
+} from "./api";
 import { ResearchChat } from "./ResearchChat";
-const ForecastPage = lazy(() => import("./ForecastPanel").then(module => ({ default: module.ForecastPage })));
-const HistoryPage = lazy(() => import("./ResearchHistory").then(module => ({ default: module.HistoryPage })));
-const SavedRunPage = lazy(() => import("./ResearchHistory").then(module => ({ default: module.SavedRunPage })));
-const WatchlistsPage = lazy(() => import("./Watchlists").then(module => ({ default: module.WatchlistsPage })));
-const DeltaReport = lazy(() => import("./DeltaReport").then(module => ({ default: module.DeltaReport })));
-const ComparisonPage = lazy(() => import("./Comparison").then(module => ({ default: module.ComparisonPage })));
-const PortfolioPage = lazy(() => import("./Portfolio").then(module => ({ default: module.PortfolioPage })));
-const CalendarPage = lazy(() => import("./Calendar").then(module => ({ default: module.CalendarPage })));
-const SettingsConsole = lazy(() => import("./SettingsConsole").then(module => ({ default: module.SettingsConsole })));
+const ForecastPage = lazy(() =>
+  import("./ForecastPanel").then((module) => ({ default: module.ForecastPage })),
+);
+const HistoryPage = lazy(() =>
+  import("./ResearchHistory").then((module) => ({ default: module.HistoryPage })),
+);
+const SavedRunPage = lazy(() =>
+  import("./ResearchHistory").then((module) => ({ default: module.SavedRunPage })),
+);
+const WatchlistsPage = lazy(() =>
+  import("./Watchlists").then((module) => ({ default: module.WatchlistsPage })),
+);
+const DeltaReport = lazy(() =>
+  import("./DeltaReport").then((module) => ({ default: module.DeltaReport })),
+);
+const ComparisonPage = lazy(() =>
+  import("./Comparison").then((module) => ({ default: module.ComparisonPage })),
+);
+const PortfolioPage = lazy(() =>
+  import("./Portfolio").then((module) => ({ default: module.PortfolioPage })),
+);
+const CalendarPage = lazy(() =>
+  import("./Calendar").then((module) => ({ default: module.CalendarPage })),
+);
+const SettingsConsole = lazy(() =>
+  import("./SettingsConsole").then((module) => ({ default: module.SettingsConsole })),
+);
 
 const tickerPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,14}$/;
 
 export function App() {
-  return <><RouteAccessibility /><Suspense fallback={<Shell><main id="main-content" tabIndex={-1}><p role="status">Loading view…</p></main></Shell>}><Routes><Route path="/" element={<ResearchForm />} /><Route path="/settings" element={<SettingsConsole />} /><Route path="/calendar" element={<CalendarPage />} /><Route path="/portfolio" element={<PortfolioPage />} /><Route path="/compare" element={<ComparisonPage />} /><Route path="/watchlists" element={<WatchlistsPage />} /><Route path="/history" element={<HistoryPage />} /><Route path="/history/:runId" element={<SavedRunPage />} /><Route path="/runs/:runId" element={<ResearchDashboard />} /><Route path="/runs/:runId/changes" element={<DeltaReport />} /><Route path="/runs/:runId/forecast" element={<ForecastPage />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></>;
+  return (
+    <>
+      <RouteAccessibility />
+      <Suspense
+        fallback={
+          <Shell>
+            <main id="main-content" tabIndex={-1}>
+              <p role="status">Loading view…</p>
+            </main>
+          </Shell>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<ResearchForm />} />
+          <Route path="/settings" element={<SettingsConsole />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/compare" element={<ComparisonPage />} />
+          <Route path="/watchlists" element={<WatchlistsPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/history/:runId" element={<SavedRunPage />} />
+          <Route path="/runs/:runId" element={<ResearchDashboard />} />
+          <Route path="/runs/:runId/changes" element={<DeltaReport />} />
+          <Route path="/runs/:runId/forecast" element={<ForecastPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
 }
 
 function ResearchForm() {
   const navigate = useNavigate();
-  const [form, setForm] = useState<ResearchRequest>({ ticker: "", investment_horizon: "medium", risk_lens: "balanced", thesis: "" });
-  const mutation = useMutation({ mutationFn: researchApi.create, onSuccess: (run) => navigate(`/runs/${run.id}`) });
+  const [form, setForm] = useState<ResearchRequest>({
+    ticker: "",
+    investment_horizon: "medium",
+    risk_lens: "balanced",
+    thesis: "",
+  });
+  const mutation = useMutation({
+    mutationFn: researchApi.create,
+    onSuccess: (run) => navigate(`/runs/${run.id}`),
+  });
   const valid = tickerPattern.test(form.ticker.trim());
-  function submit(event: FormEvent) { event.preventDefault(); if (valid) mutation.mutate({ ...form, ticker: form.ticker.trim().toUpperCase() }); }
-  return <Shell><main id="main-content" tabIndex={-1} className="landing"><p className="eyebrow">Evidence-first research</p><h1>Start with the facts.</h1><p className="lede">Build a source-grounded investment research snapshot. This is research and education, not personalized investment advice.</p><form className="research-form" onSubmit={submit} noValidate>
-    <label htmlFor="ticker">Ticker or ETF symbol</label><input id="ticker" value={form.ticker} onChange={(e) => setForm({ ...form, ticker: e.target.value })} aria-invalid={!!form.ticker && !valid} aria-describedby={form.ticker && !valid ? "ticker-help ticker-error" : "ticker-help"} autoCapitalize="characters" placeholder="AAPL" required />
-    <small id="ticker-help">Letters, numbers, periods, underscores, or hyphens; up to 15 characters.</small>{form.ticker && !valid && <p id="ticker-error" className="field-error" role="alert">Enter a valid ticker symbol.</p>}
-    <div className="form-grid"><label>Investment horizon<select value={form.investment_horizon} onChange={(e) => setForm({ ...form, investment_horizon: e.target.value })}><option value="short">Short term</option><option value="medium">Medium term</option><option value="long">Long term</option></select></label><label>Risk lens<select value={form.risk_lens} onChange={(e) => setForm({ ...form, risk_lens: e.target.value })}><option value="balanced">Balanced</option><option value="conservative">Conservative</option><option value="growth">Growth</option></select></label></div>
-    <label htmlFor="thesis">Optional thesis</label><textarea id="thesis" value={form.thesis} onChange={(e) => setForm({ ...form, thesis: e.target.value })} maxLength={500} placeholder="What are you looking to validate?" />
-    <label className="forecast-opt-in"><input type="checkbox" checked={!!form.include_kronos} onChange={e => setForm({ ...form, include_kronos: e.target.checked })} /> Include optional Kronos research (requires local setup)</label>
-    {form.include_kronos && <label>Forecast sessions<select value={form.forecast_horizon ?? 5} onChange={e => setForm({ ...form, forecast_horizon: Number(e.target.value) })}>{[1, 5, 10, 20].map(n => <option key={n} value={n}>{n} exchange sessions</option>)}</select></label>}
-    {mutation.error && <ErrorNotice error={mutation.error as ApiFailure} />}<button type="submit" disabled={!valid || mutation.isPending}>{mutation.isPending ? "Starting research…" : "Start research"}</button>
-  </form></main></Shell>;
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (valid) mutation.mutate({ ...form, ticker: form.ticker.trim().toUpperCase() });
+  }
+  return (
+    <Shell>
+      <main id="main-content" tabIndex={-1} className="landing">
+        <p className="eyebrow">Evidence-first research</p>
+        <h1>Start with the facts.</h1>
+        <p className="lede">
+          Build a source-grounded investment research snapshot. This is research and education, not
+          personalized investment advice.
+        </p>
+        <form className="research-form" onSubmit={submit} noValidate>
+          <label htmlFor="ticker">Ticker or ETF symbol</label>
+          <input
+            id="ticker"
+            value={form.ticker}
+            onChange={(e) => setForm({ ...form, ticker: e.target.value })}
+            aria-invalid={!!form.ticker && !valid}
+            aria-describedby={form.ticker && !valid ? "ticker-help ticker-error" : "ticker-help"}
+            autoCapitalize="characters"
+            placeholder="AAPL"
+            required
+          />
+          <small id="ticker-help">
+            Letters, numbers, periods, underscores, or hyphens; up to 15 characters.
+          </small>
+          {form.ticker && !valid && (
+            <p id="ticker-error" className="field-error" role="alert">
+              Enter a valid ticker symbol.
+            </p>
+          )}
+          <div className="form-grid">
+            <label>
+              Investment horizon
+              <select
+                value={form.investment_horizon}
+                onChange={(e) => setForm({ ...form, investment_horizon: e.target.value })}
+              >
+                <option value="short">Short term</option>
+                <option value="medium">Medium term</option>
+                <option value="long">Long term</option>
+              </select>
+            </label>
+            <label>
+              Risk lens
+              <select
+                value={form.risk_lens}
+                onChange={(e) => setForm({ ...form, risk_lens: e.target.value })}
+              >
+                <option value="balanced">Balanced</option>
+                <option value="conservative">Conservative</option>
+                <option value="growth">Growth</option>
+              </select>
+            </label>
+          </div>
+          <label htmlFor="thesis">Optional thesis</label>
+          <textarea
+            id="thesis"
+            value={form.thesis}
+            onChange={(e) => setForm({ ...form, thesis: e.target.value })}
+            maxLength={500}
+            placeholder="What are you looking to validate?"
+          />
+          <label className="forecast-opt-in">
+            <input
+              type="checkbox"
+              checked={!!form.include_kronos}
+              onChange={(e) => setForm({ ...form, include_kronos: e.target.checked })}
+            />{" "}
+            Include optional Kronos research (requires local setup)
+          </label>
+          {form.include_kronos && (
+            <label>
+              Forecast sessions
+              <select
+                value={form.forecast_horizon ?? 5}
+                onChange={(e) => setForm({ ...form, forecast_horizon: Number(e.target.value) })}
+              >
+                {[1, 5, 10, 20].map((n) => (
+                  <option key={n} value={n}>
+                    {n} exchange sessions
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {mutation.error && <ErrorNotice error={mutation.error as ApiFailure} />}
+          <button type="submit" disabled={!valid || mutation.isPending}>
+            {mutation.isPending ? "Starting research…" : "Start research"}
+          </button>
+        </form>
+      </main>
+    </Shell>
+  );
 }
 
 function ResearchDashboard() {
-  const { runId = "" } = useParams(); const client = useQueryClient(); const [streamState, setStreamState] = useState("Connecting to progress updates…");
-  const run = useQuery({ queryKey: ["run", runId], queryFn: () => researchApi.get(runId), refetchInterval: (query) => active(query.state.data?.status) ? 2_000 : false });
-  const snapshots = useQuery({ queryKey: ["snapshots", runId], queryFn: () => researchApi.snapshots(runId), refetchInterval: () => active(run.data?.status) ? 2_000 : false });
-  const report = useQuery({ queryKey: ["report", runId], queryFn: () => researchApi.report(runId), enabled: ["completed", "failed"].includes(run.data?.status ?? ""), retry: false });
-  const cancel = useMutation({ mutationFn: () => researchApi.cancel(runId), onSuccess: () => client.invalidateQueries({ queryKey: ["run", runId] }) });
-  const retry = useMutation({ mutationFn: () => researchApi.retry(runId), onSuccess: () => { client.invalidateQueries({ queryKey: ["run", runId] }); client.invalidateQueries({ queryKey: ["snapshots", runId] }); } });
-  useEffect(() => { if (!runId) return; const source = subscribeToRun(runId, () => { setStreamState("Live progress connected"); client.invalidateQueries({ queryKey: ["run", runId] }); client.invalidateQueries({ queryKey: ["snapshots", runId] }); }, () => setStreamState("Reconnecting to progress updates…")); return () => source.close(); }, [client, runId]);
-  if (run.isLoading) return <Shell><main id="main-content" tabIndex={-1}><Loading /></main></Shell>; if (run.error || !run.data) return <Shell><main id="main-content" tabIndex={-1}><ErrorNotice error={run.error as ApiFailure} /></main></Shell>;
-  return <Shell><main id="main-content" tabIndex={-1}><Link to="/" className="back-link">← New research</Link><header className="run-header"><div><p className="eyebrow">Research run</p><h1>{run.data.ticker}</h1><p className="muted" role="status">{streamState} · Run {run.data.status}</p></div><Status status={run.data.status} /></header>
-    <Progress snapshots={snapshots.data ?? []} status={run.data.status} />
-    <SyntheticNotice snapshots={snapshots.data ?? []} />
-    <PriceHistory snapshots={snapshots.data ?? []} />
-    <p><Link to={`/runs/${runId}/forecast`}>Forecast research and model card →</Link></p>
-    <ResearchChat key={runId} runId={runId} />
-    {(cancel.error || retry.error) && <ErrorNotice error={(cancel.error || retry.error) as ApiFailure} />}<div className="actions">{active(run.data.status) && <button className="secondary" onClick={() => cancel.mutate()} disabled={cancel.isPending}>Cancel run</button>}{["failed", "cancelled"].includes(run.data.status) && <button onClick={() => retry.mutate()} disabled={retry.isPending}>Retry research</button>}</div>
-    {["completed", "failed"].includes(run.data.status) && <Overview snapshots={snapshots.data ?? []} ticker={run.data.ticker} assetType={run.data.asset_type ?? "equity"} report={report.data} />}{snapshots.error && <ErrorNotice error={snapshots.error as ApiFailure} />}
-  </main></Shell>;
+  const { runId = "" } = useParams();
+  const client = useQueryClient();
+  const [streamState, setStreamState] = useState("Connecting to progress updates…");
+  const run = useQuery({
+    queryKey: ["run", runId],
+    queryFn: () => researchApi.get(runId),
+    refetchInterval: (query) => (active(query.state.data?.status) ? 2_000 : false),
+  });
+  const snapshots = useQuery({
+    queryKey: ["snapshots", runId],
+    queryFn: () => researchApi.snapshots(runId),
+    refetchInterval: () => (active(run.data?.status) ? 2_000 : false),
+  });
+  const report = useQuery({
+    queryKey: ["report", runId],
+    queryFn: () => researchApi.report(runId),
+    enabled: ["completed", "failed"].includes(run.data?.status ?? ""),
+    retry: false,
+  });
+  const cancel = useMutation({
+    mutationFn: () => researchApi.cancel(runId),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["run", runId] }),
+  });
+  const retry = useMutation({
+    mutationFn: () => researchApi.retry(runId),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ["run", runId] });
+      client.invalidateQueries({ queryKey: ["snapshots", runId] });
+    },
+  });
+  useEffect(() => {
+    if (!runId) return;
+    const source = subscribeToRun(
+      runId,
+      () => {
+        setStreamState("Live progress connected");
+        client.invalidateQueries({ queryKey: ["run", runId] });
+        client.invalidateQueries({ queryKey: ["snapshots", runId] });
+      },
+      () => setStreamState("Reconnecting to progress updates…"),
+    );
+    return () => source.close();
+  }, [client, runId]);
+  if (run.isLoading)
+    return (
+      <Shell>
+        <main id="main-content" tabIndex={-1}>
+          <Loading />
+        </main>
+      </Shell>
+    );
+  if (run.error || !run.data)
+    return (
+      <Shell>
+        <main id="main-content" tabIndex={-1}>
+          <ErrorNotice error={run.error as ApiFailure} />
+        </main>
+      </Shell>
+    );
+  return (
+    <Shell>
+      <main id="main-content" tabIndex={-1}>
+        <Link to="/" className="back-link">
+          ← New research
+        </Link>
+        <header className="run-header">
+          <div>
+            <p className="eyebrow">Research run</p>
+            <h1>{run.data.ticker}</h1>
+            <p className="muted" role="status">
+              {streamState} · Run {run.data.status}
+            </p>
+          </div>
+          <Status status={run.data.status} />
+        </header>
+        <Progress snapshots={snapshots.data ?? []} status={run.data.status} />
+        <SyntheticNotice snapshots={snapshots.data ?? []} />
+        <PriceHistory snapshots={snapshots.data ?? []} />
+        <p>
+          <Link to={`/runs/${runId}/forecast`}>Forecast research and model card →</Link>
+        </p>
+        <ResearchChat key={runId} runId={runId} />
+        {(cancel.error || retry.error) && (
+          <ErrorNotice error={(cancel.error || retry.error) as ApiFailure} />
+        )}
+        <div className="actions">
+          {active(run.data.status) && (
+            <button
+              className="secondary"
+              onClick={() => cancel.mutate()}
+              disabled={cancel.isPending}
+            >
+              Cancel run
+            </button>
+          )}
+          {["failed", "cancelled"].includes(run.data.status) && (
+            <button onClick={() => retry.mutate()} disabled={retry.isPending}>
+              Retry research
+            </button>
+          )}
+        </div>
+        {["completed", "failed"].includes(run.data.status) && (
+          <Overview
+            snapshots={snapshots.data ?? []}
+            ticker={run.data.ticker}
+            assetType={run.data.asset_type ?? "equity"}
+            report={report.data}
+          />
+        )}
+        {snapshots.error && <ErrorNotice error={snapshots.error as ApiFailure} />}
+      </main>
+    </Shell>
+  );
 }
 
-function Progress({ snapshots, status }: { snapshots: ResearchSnapshot[]; status: string }) { const lanes = ["instrument", "quote", "ohlcv", "filings", "statements"]; return <section aria-labelledby="progress-heading" className="card"><h2 id="progress-heading">Collection progress</h2><ol className="lanes">{lanes.map((lane) => { const item = snapshots.find((snapshot) => snapshot.lane === lane); return <li key={lane}><span>{lane}</span><Status status={item?.status ?? (status === "cancelled" ? "cancelled" : "pending")} />{item?.error_message && <span className="field-error">{item.error_message}</span>}</li>; })}</ol></section>; }
+function Progress({ snapshots, status }: { snapshots: ResearchSnapshot[]; status: string }) {
+  const lanes = ["instrument", "quote", "ohlcv", "filings", "statements"];
+  return (
+    <section aria-labelledby="progress-heading" className="card">
+      <h2 id="progress-heading">Collection progress</h2>
+      <ol className="lanes">
+        {lanes.map((lane) => {
+          const item = snapshots.find((snapshot) => snapshot.lane === lane);
+          return (
+            <li key={lane}>
+              <span>{lane}</span>
+              <Status status={item?.status ?? (status === "cancelled" ? "cancelled" : "pending")} />
+              {item?.error_message && <span className="field-error">{item.error_message}</span>}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
 
-function Overview({ snapshots, ticker, assetType, report }: { snapshots: ResearchSnapshot[]; ticker: string; assetType: "equity" | "etf"; report?: ResearchReport }) { const [evidence, setEvidence] = useState<ResearchSnapshot | null>(null); const quote = snapshots.find((item) => item.lane === "quote")?.payload; const identity = snapshots.find((item) => item.lane === "instrument")?.payload; const peerData = snapshots.find((item) => item.lane === "peers")?.payload ?? null; const earningsData = snapshots.find((item) => item.lane === "earnings")?.payload ?? null; const guidanceData = snapshots.find((item) => item.lane === "guidance")?.payload ?? null; const analystData = snapshots.find((item) => item.lane === "analysts")?.payload ?? null; const etfData = snapshots.find((item) => item.lane === "etf")?.payload ?? null; const qualityData = snapshots.find((item) => item.lane === "quality")?.payload ?? null; const technicalData = snapshots.find((item) => item.lane === "technical")?.payload ?? null; const isEtf = assetType === "etf"; return <><section className="dashboard-grid" aria-label="Research overview"><InfoCard title={isEtf ? "Fund identity" : "Company identity"} value={stringValue(identity, "name") ?? ticker} detail={stringValue(identity, "exchange") ?? "Identity source pending"} /><InfoCard title="Quote" value={stringValue(quote, "price") ?? "Unavailable"} detail={freshness(quote)} />{isEtf ? <ETFPanel data={etfData} /> : <><InfoCard title="Financial trends" value={summary(snapshots, "statements")} detail="Reported figures retain filing periods and units." /><InfoCard title="Latest filings" value={summary(snapshots, "filings")} detail="Source links are retained with the evidence." /></>}</section>{report && <ReportPanel report={report} />}{!isEtf && <><EarningsPanel earnings={earningsData} guidance={guidanceData} analysts={analystData} /><PeerPanel data={peerData} /></>}<QualityPanel data={qualityData} /><TechnicalPanel data={technicalData} /><section className="card"><h2>Evidence</h2><p className="muted">Open a collection result to inspect its exact source links and payload. No language model is required for this view.</p><div className="evidence-list">{snapshots.map((item) => <button className="evidence-button" key={item.lane} onClick={() => setEvidence(item)}>{item.lane}<Status status={item.status} /></button>)}</div></section>{evidence && <EvidenceDrawer snapshot={evidence} onClose={() => setEvidence(null)} />}</>; }
+function Overview({
+  snapshots,
+  ticker,
+  assetType,
+  report,
+}: {
+  snapshots: ResearchSnapshot[];
+  ticker: string;
+  assetType: "equity" | "etf";
+  report?: ResearchReport;
+}) {
+  const [evidence, setEvidence] = useState<ResearchSnapshot | null>(null);
+  const quote = snapshots.find((item) => item.lane === "quote")?.payload;
+  const identity = snapshots.find((item) => item.lane === "instrument")?.payload;
+  const peerData = snapshots.find((item) => item.lane === "peers")?.payload ?? null;
+  const earningsData = snapshots.find((item) => item.lane === "earnings")?.payload ?? null;
+  const guidanceData = snapshots.find((item) => item.lane === "guidance")?.payload ?? null;
+  const analystData = snapshots.find((item) => item.lane === "analysts")?.payload ?? null;
+  const etfData = snapshots.find((item) => item.lane === "etf")?.payload ?? null;
+  const qualityData = snapshots.find((item) => item.lane === "quality")?.payload ?? null;
+  const technicalData = snapshots.find((item) => item.lane === "technical")?.payload ?? null;
+  const isEtf = assetType === "etf";
+  return (
+    <>
+      <section className="dashboard-grid" aria-label="Research overview">
+        <InfoCard
+          title={isEtf ? "Fund identity" : "Company identity"}
+          value={stringValue(identity, "name") ?? ticker}
+          detail={stringValue(identity, "exchange") ?? "Identity source pending"}
+        />
+        <InfoCard
+          title="Quote"
+          value={stringValue(quote, "price") ?? "Unavailable"}
+          detail={freshness(quote)}
+        />
+        {isEtf ? (
+          <ETFPanel data={etfData} />
+        ) : (
+          <>
+            <InfoCard
+              title="Financial trends"
+              value={summary(snapshots, "statements")}
+              detail="Reported figures retain filing periods and units."
+            />
+            <InfoCard
+              title="Latest filings"
+              value={summary(snapshots, "filings")}
+              detail="Source links are retained with the evidence."
+            />
+          </>
+        )}
+      </section>
+      {report && <ReportPanel report={report} />}
+      {!isEtf && (
+        <>
+          <EarningsPanel earnings={earningsData} guidance={guidanceData} analysts={analystData} />
+          <PeerPanel data={peerData} />
+        </>
+      )}
+      <QualityPanel data={qualityData} />
+      <TechnicalPanel data={technicalData} />
+      <section className="card">
+        <h2>Evidence</h2>
+        <p className="muted">
+          Open a collection result to inspect its exact source links and payload. No language model
+          is required for this view.
+        </p>
+        <div className="evidence-list">
+          {snapshots.map((item) => (
+            <button className="evidence-button" key={item.lane} onClick={() => setEvidence(item)}>
+              {item.lane}
+              <Status status={item.status} />
+            </button>
+          ))}
+        </div>
+      </section>
+      {evidence && <EvidenceDrawer snapshot={evidence} onClose={() => setEvidence(null)} />}
+    </>
+  );
+}
 
-function ReportPanel({ report }: { report: ResearchReport }) { return <section className="card" aria-labelledby="report-heading"><h2 id="report-heading">Decision brief</h2><p className="muted">As of {report.as_of} · report version {report.version}</p><ul>{report.decision_brief.map((item, i) => <li key={i}>{item}</li>)}</ul><ReportSections key={report.id} report={report} /></section>; }
+function ReportPanel({ report }: { report: ResearchReport }) {
+  return (
+    <section className="card" aria-labelledby="report-heading">
+      <h2 id="report-heading">Decision brief</h2>
+      <p className="muted">
+        As of {report.as_of} · report version {report.version}
+      </p>
+      <ul>
+        {report.decision_brief.map((item, i) => (
+          <li key={i}>{item}</li>
+        ))}
+      </ul>
+      <ReportSections key={report.id} report={report} />
+    </section>
+  );
+}
 
-function InfoCard({ title, value, detail }: { title: string; value: string; detail: string }) { return <section className="card"><h2>{title}</h2><p className="metric">{value}</p><p className="muted">{detail}</p></section>; }
+function InfoCard({ title, value, detail }: { title: string; value: string; detail: string }) {
+  return (
+    <section className="card">
+      <h2>{title}</h2>
+      <p className="metric">{value}</p>
+      <p className="muted">{detail}</p>
+    </section>
+  );
+}
 
-function PeerPanel({ data }: { data: Record<string, unknown> | null }) { const defaultPeers = useMemo(() => stringList(data?.symbols), [data]); const [peers, setPeers] = useState(defaultPeers); const [symbol, setSymbol] = useState(""); const rule = stringValue(data, "selection_rule") ?? "Peer analysis will use the same industry, relevant geography, and a comparable market-cap range."; function addPeer() { const next = symbol.trim().toUpperCase(); if (/^[A-Z0-9._-]{1,15}$/.test(next) && !peers.includes(next)) setPeers([...peers, next]); setSymbol(""); } return <section className="card" aria-labelledby="peers-heading"><h2 id="peers-heading">Comparable companies</h2><p className="muted">Selection rule: {rule}</p><p className="muted">Manual changes affect this research view only and are clearly separate from the default peer universe.</p><div className="peer-controls"><label htmlFor="peer-symbol">Add peer symbol<input id="peer-symbol" value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MSFT" /></label><button type="button" onClick={addPeer}>Add peer</button></div><div className="peer-list">{peers.length ? peers.map((peer) => <button type="button" className="secondary" key={peer} onClick={() => setPeers(peers.filter((item) => item !== peer))}>{peer} ×</button>) : <span className="muted">No peer data collected yet.</span>}</div></section>; }
+function PeerPanel({ data }: { data: Record<string, unknown> | null }) {
+  const defaultPeers = useMemo(() => stringList(data?.symbols), [data]);
+  const [peers, setPeers] = useState(defaultPeers);
+  const [symbol, setSymbol] = useState("");
+  const rule =
+    stringValue(data, "selection_rule") ??
+    "Peer analysis will use the same industry, relevant geography, and a comparable market-cap range.";
+  function addPeer() {
+    const next = symbol.trim().toUpperCase();
+    if (/^[A-Z0-9._-]{1,15}$/.test(next) && !peers.includes(next)) setPeers([...peers, next]);
+    setSymbol("");
+  }
+  return (
+    <section className="card" aria-labelledby="peers-heading">
+      <h2 id="peers-heading">Comparable companies</h2>
+      <p className="muted">Selection rule: {rule}</p>
+      <p className="muted">
+        Manual changes affect this research view only and are clearly separate from the default peer
+        universe.
+      </p>
+      <div className="peer-controls">
+        <label htmlFor="peer-symbol">
+          Add peer symbol
+          <input
+            id="peer-symbol"
+            value={symbol}
+            onChange={(event) => setSymbol(event.target.value)}
+            placeholder="MSFT"
+          />
+        </label>
+        <button type="button" onClick={addPeer}>
+          Add peer
+        </button>
+      </div>
+      <div className="peer-list">
+        {peers.length ? (
+          peers.map((peer) => (
+            <button
+              type="button"
+              className="secondary"
+              key={peer}
+              onClick={() => setPeers(peers.filter((item) => item !== peer))}
+            >
+              {peer} ×
+            </button>
+          ))
+        ) : (
+          <span className="muted">No peer data collected yet.</span>
+        )}
+      </div>
+    </section>
+  );
+}
 
-function EarningsPanel({ earnings, guidance, analysts }: { earnings: Record<string, unknown> | null; guidance: Record<string, unknown> | null; analysts: Record<string, unknown> | null }) { return <section className="card" aria-labelledby="expectations-heading"><h2 id="expectations-heading">Earnings and expectations</h2><p><strong>Upcoming earnings:</strong> {stringValue(earnings, "scheduled_at") ?? "Unavailable"} · {stringValue(earnings, "release_session") ?? "Release session unavailable"}</p><p><strong>Management guidance:</strong> {guidance ? (stringValue(guidance, "origin") === "explicit_management" ? "Explicit management guidance (cited wording available in evidence)." : "Inferred guidance — not a management statement.") : "Unavailable"}</p><p><strong>Analyst view:</strong> Public analyst consensus, not proprietary analyst reports. {stringValue(analysts, "analyst_count") ? `Based on ${stringValue(analysts, "analyst_count")} analysts.` : ""}</p></section>; }
-function ETFPanel({ data }: { data: Record<string, unknown> | null }) { return <><InfoCard title="ETF fees" value={stringValue(data, "expense_ratio") ?? "Unavailable"} detail="Expense ratio and tracking data are fund-specific." /><section className="card"><h2>ETF composition</h2><p className="muted">Holdings, concentration, sector exposure, liquidity, tracking, and constituent risk replace corporate earnings analysis.</p><p>Top holdings: {stringValue(data, "top_ten_weight") ?? "Unavailable"} · Tracking difference: {stringValue(data, "tracking_difference") ?? "Unavailable"}</p></section></>; }
-function QualityPanel({ data }: { data: Record<string, unknown> | null }) { const reasons = stringList(data?.reasons); return <section className="card" aria-labelledby="quality-heading"><h2 id="quality-heading">Data quality</h2><p className="metric">{stringValue(data, "grade") ?? "Not assessed"}</p><p className="muted">This is a coverage grade with reasons, not a forecast-confidence score.</p>{reasons.length > 0 && <ul>{reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}</section>; }
-function TechnicalPanel({ data }: { data: Record<string, unknown> | null }) { return <section className="card"><h2>Technical conditions</h2><p>Trend: {stringValue(data, "trend") ?? "Unavailable"} · Momentum: {stringValue(data, "momentum") ?? "Unavailable"} · Regime: {stringValue(data, "regime") ?? "Unavailable"}</p><p className="muted">These are observed market conditions, not buy or sell commands.</p></section>; }
+function EarningsPanel({
+  earnings,
+  guidance,
+  analysts,
+}: {
+  earnings: Record<string, unknown> | null;
+  guidance: Record<string, unknown> | null;
+  analysts: Record<string, unknown> | null;
+}) {
+  return (
+    <section className="card" aria-labelledby="expectations-heading">
+      <h2 id="expectations-heading">Earnings and expectations</h2>
+      <p>
+        <strong>Upcoming earnings:</strong> {stringValue(earnings, "scheduled_at") ?? "Unavailable"}{" "}
+        · {stringValue(earnings, "release_session") ?? "Release session unavailable"}
+      </p>
+      <p>
+        <strong>Management guidance:</strong>{" "}
+        {guidance
+          ? stringValue(guidance, "origin") === "explicit_management"
+            ? "Explicit management guidance (cited wording available in evidence)."
+            : "Inferred guidance — not a management statement."
+          : "Unavailable"}
+      </p>
+      <p>
+        <strong>Analyst view:</strong> Public analyst consensus, not proprietary analyst reports.{" "}
+        {stringValue(analysts, "analyst_count")
+          ? `Based on ${stringValue(analysts, "analyst_count")} analysts.`
+          : ""}
+      </p>
+    </section>
+  );
+}
+function ETFPanel({ data }: { data: Record<string, unknown> | null }) {
+  return (
+    <>
+      <InfoCard
+        title="ETF fees"
+        value={stringValue(data, "expense_ratio") ?? "Unavailable"}
+        detail="Expense ratio and tracking data are fund-specific."
+      />
+      <section className="card">
+        <h2>ETF composition</h2>
+        <p className="muted">
+          Holdings, concentration, sector exposure, liquidity, tracking, and constituent risk
+          replace corporate earnings analysis.
+        </p>
+        <p>
+          Top holdings: {stringValue(data, "top_ten_weight") ?? "Unavailable"} · Tracking
+          difference: {stringValue(data, "tracking_difference") ?? "Unavailable"}
+        </p>
+      </section>
+    </>
+  );
+}
+function QualityPanel({ data }: { data: Record<string, unknown> | null }) {
+  const reasons = stringList(data?.reasons);
+  return (
+    <section className="card" aria-labelledby="quality-heading">
+      <h2 id="quality-heading">Data quality</h2>
+      <p className="metric">{stringValue(data, "grade") ?? "Not assessed"}</p>
+      <p className="muted">
+        This is a coverage grade with reasons, not a forecast-confidence score.
+      </p>
+      {reasons.length > 0 && (
+        <ul>
+          {reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+function TechnicalPanel({ data }: { data: Record<string, unknown> | null }) {
+  return (
+    <section className="card">
+      <h2>Technical conditions</h2>
+      <p>
+        Trend: {stringValue(data, "trend") ?? "Unavailable"} · Momentum:{" "}
+        {stringValue(data, "momentum") ?? "Unavailable"} · Regime:{" "}
+        {stringValue(data, "regime") ?? "Unavailable"}
+      </p>
+      <p className="muted">These are observed market conditions, not buy or sell commands.</p>
+    </section>
+  );
+}
 
-function EvidenceDrawer({ snapshot, onClose }: { snapshot: ResearchSnapshot; onClose: () => void }) { const urls = collectUrls(snapshot.payload); return <EvidenceDialog title={snapshot.lane + " evidence"} onClose={onClose}><pre>{JSON.stringify(snapshot.payload, null, 2)}</pre><h3>Exact links</h3>{urls.length ? <ul>{urls.map((url) => <li key={url}><a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer">{url}</a></li>)}</ul> : <p>No source URLs are available for this lane yet.</p>}</EvidenceDialog>; }
+function EvidenceDrawer({
+  snapshot,
+  onClose,
+}: {
+  snapshot: ResearchSnapshot;
+  onClose: () => void;
+}) {
+  const urls = collectUrls(snapshot.payload);
+  return (
+    <EvidenceDialog title={snapshot.lane + " evidence"} onClose={onClose}>
+      <pre>{JSON.stringify(snapshot.payload, null, 2)}</pre>
+      <h3>Exact links</h3>
+      {urls.length ? (
+        <ul>
+          {urls.map((url) => (
+            <li key={url}>
+              <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer">
+                {url}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No source URLs are available for this lane yet.</p>
+      )}
+    </EvidenceDialog>
+  );
+}
 
-function Shell({ children }: { children: React.ReactNode }) { return <div className="app-shell"><Navigation />{children}<footer>Evidence-first research. Not investment advice.</footer></div>; }
-function Status({ status }: { status: string }) { return <span className={`status status-${status}`}>{status}</span>; }
-function Loading() { return <p className="loading" role="status">Loading research run…</p>; }
-function ErrorNotice({ error }: { error: ApiFailure | null | undefined }) { return <section className="error" role="alert"><strong>We could not complete that request.</strong><p>{error?.message ?? "Try again in a moment."}</p>{error?.correlationId && <small>Reference: {error.correlationId}</small>}</section>; }
-function active(status: string | undefined) { return status === "pending" || status === "running"; }
-function stringValue(value: Record<string, unknown> | null | undefined, key: string) { const item = value?.[key]; return typeof item === "string" || typeof item === "number" ? String(item) : undefined; }
-function freshness(value: Record<string, unknown> | null | undefined) { return stringValue(value, "retrieved_at") ? `Retrieved ${stringValue(value, "retrieved_at")}` : "Freshness unavailable"; }
-function summary(items: ResearchSnapshot[], lane: string) { const value = items.find((item) => item.lane === lane)?.payload; return value ? "Available" : "No data"; }
-function collectUrls(value: Record<string, unknown> | null): string[] { if (!value) return []; return Object.values(value).flatMap((item) => typeof item === "string" && /^https?:\/\//.test(item) ? [item] : []); }
-function stringList(value: unknown): string[] { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="app-shell">
+      <Navigation />
+      {children}
+      <footer>Evidence-first research. Not investment advice.</footer>
+    </div>
+  );
+}
+function Status({ status }: { status: string }) {
+  return <span className={`status status-${status}`}>{status}</span>;
+}
+function Loading() {
+  return (
+    <p className="loading" role="status">
+      Loading research run…
+    </p>
+  );
+}
+function ErrorNotice({ error }: { error: ApiFailure | null | undefined }) {
+  return (
+    <section className="error" role="alert">
+      <strong>We could not complete that request.</strong>
+      <p>{error?.message ?? "Try again in a moment."}</p>
+      {error?.correlationId && <small>Reference: {error.correlationId}</small>}
+    </section>
+  );
+}
+function active(status: string | undefined) {
+  return status === "pending" || status === "running";
+}
+function stringValue(value: Record<string, unknown> | null | undefined, key: string) {
+  const item = value?.[key];
+  return typeof item === "string" || typeof item === "number" ? String(item) : undefined;
+}
+function freshness(value: Record<string, unknown> | null | undefined) {
+  return stringValue(value, "retrieved_at")
+    ? `Retrieved ${stringValue(value, "retrieved_at")}`
+    : "Freshness unavailable";
+}
+function summary(items: ResearchSnapshot[], lane: string) {
+  const value = items.find((item) => item.lane === lane)?.payload;
+  return value ? "Available" : "No data";
+}
+function collectUrls(value: Record<string, unknown> | null): string[] {
+  if (!value) return [];
+  return Object.values(value).flatMap((item) =>
+    typeof item === "string" && /^https?:\/\//.test(item) ? [item] : [],
+  );
+}
+function stringList(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}

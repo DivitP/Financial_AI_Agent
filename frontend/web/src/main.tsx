@@ -5,13 +5,21 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import "./styles.css";
 
-const queryClient = new QueryClient({ defaultOptions: { queries: {
-  retry: (count, error) => (error as { code?: string }).code !== "quota_exceeded" && count < 1,
-  staleTime: 15_000,
-} } });
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (count, error) => (error as { code?: string }).code !== "quota_exceeded" && count < 1,
+      staleTime: 15_000,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter><QueryClientProvider client={queryClient}><App /></QueryClientProvider></BrowserRouter>
+    <BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );
