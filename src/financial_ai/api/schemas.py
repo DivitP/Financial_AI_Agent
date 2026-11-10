@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from financial_ai.domain.forecast import KronosResponse, KronosForecastData
+from financial_ai.domain.research_mode import ResearchMode
 
 
 class ApiSchema(BaseModel):
@@ -60,6 +61,7 @@ class ResearchSnapshotResponse(ApiSchema):
 
 
 class ReportResponse(ApiSchema):
+    research_mode: ResearchMode = "unknown"
     id: UUID
     run_id: UUID
     version: int
@@ -98,6 +100,7 @@ class HistoryUpdate(ApiSchema):
 
 
 class HistoryItem(BaseModel):
+    research_mode: ResearchMode = "unknown"
     id: str
     ticker: str
     status: str

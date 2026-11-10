@@ -18,6 +18,7 @@ x-app: &app
     ALLOWED_HOSTS: '["localhost","127.0.0.1","api"]'
     ALLOWED_BROWSER_ORIGINS: '["http://localhost:8080","http://127.0.0.1:8080"]'
     WORKER_HANDLER_FACTORY: financial_ai.workflow.demo:handler
+    SYNTHETIC_EVIDENCE_ORIGIN: http://localhost:8080
     ENABLE_GROQ: "false"
     ENABLE_FMP: "false"
     ENABLE_LOCAL_LLM: "false"

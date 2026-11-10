@@ -30,9 +30,19 @@ def smoke(base="http://web:8080"):
         state = request(f"/api/v1/research-runs/{run['id']}")
         if state["status"] == "completed":
             snapshots = request(f"/api/v1/research-runs/{run['id']}/snapshot")
-            assert len(snapshots) == 5
-            assert all(s["payload"]["provider"] == "offline-demo" for s in snapshots)
-            print("PASS: web proxy, API, queue, worker and database completed an OFFLINE DEMO run.")
+            lanes = {s["lane"]: s for s in snapshots}
+            assert lanes["quote"]["payload"]["synthetic"] is True
+            assert len(lanes["ohlcv"]["payload"]["candles"]) == 60
+            assert lanes["charts"]["payload"]["charts"]
+            report = request(f"/api/v1/research-runs/{run['id']}/reports/latest")
+            assert (
+                report["research_mode"] == "synthetic"
+                and report["sections"]
+                and report["evidence_links"]
+            )
+            print(
+                "PASS: OFFLINE DEMO completed collection, analysis, chart and saved report through the shared pipeline."
+            )
             return
         if state["status"] in {"failed", "cancelled"}:
             raise RuntimeError("Demo run did not complete; inspect compose logs")

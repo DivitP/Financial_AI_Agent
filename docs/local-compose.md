@@ -12,11 +12,14 @@ docker compose exec -T api python -m financial_ai.ops smoke
 
 Open http://localhost:8080 (React UI) or http://localhost:8000/docs (API).
 **The default worker is an OFFLINE DEMO, not live financial research.** The UI
-identity and saved snapshots explicitly say so; no financial prices or reports
-are fabricated. The smoke command creates one persisted synthetic AAPL run and
-checks the web proxy → API → Redis worker → Postgres path. Do not use demo output
-to make investment decisions. Existing live adapters are not yet assembled into
-a bundled production worker handler; this deployment does not pretend otherwise.
+identity, report and exports explicitly label invented financial figures. The
+default handler uses the shared synthetic collector and research pipeline for
+collection, calculations, a persisted chart, indexed evidence and a saved report.
+The smoke command creates a synthetic AAPL run and checks the web proxy → API →
+Redis worker → Postgres path, including price history, chart and report output.
+It does not certify live-provider coverage. Do not use demo output for investment
+decisions. Supported labels are AAPL, MSFT, NVDA, SPY and QQQ; unknown symbols fail
+without live fallback. Evidence destinations use the web origin localhost:8080.
 
 ## Services, storage and security
 

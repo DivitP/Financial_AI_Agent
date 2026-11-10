@@ -1,4 +1,6 @@
 import { RawData } from "./RawData";
+import { ResearchModeNotice } from "./ResearchModeNotice";
+import { PriceHistory } from "./PriceHistory";
 import { ReportSections } from "./ReportSections";
 import { Navigation } from "./Accessibility";
 import { safeExternalUrl } from "./security";
@@ -21,7 +23,7 @@ export function HistoryPage() {
       <label>Archive filter<select value={archive} onChange={e => { setArchive(e.target.value); setPage(0); }}><option value="active">Not archived</option><option value="archived">Archived</option><option value="all">All runs</option></select></label></div>
     {history.isLoading && <p role="status">Loading saved runs…</p>}{history.error && <p role="alert">{history.error.message}</p>}
     {history.data?.length === 0 && <p>No matching saved runs.</p>}
-    {history.data?.map(run => <article className="card" key={run.id}><h2><Link to={`/history/${run.id}`}>{run.name || run.ticker}</Link></h2><p>{run.ticker} · {run.status} · {run.archived ? "Archived" : "Not archived"}</p><p>Requested {run.requested_at} · {run.report_count} saved report versions</p></article>)}
+    {history.data?.map(run => <article className="card" key={run.id}><h2><Link to={`/history/${run.id}`}>{run.name || run.ticker}</Link></h2><p>{run.ticker} · {run.status} · {run.archived ? "Archived" : "Not archived"}</p><ResearchModeNotice mode={run.research_mode} /><p>Requested {run.requested_at} · {run.report_count} saved report versions</p></article>)}
     <div className="actions"><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous page</button><button disabled={!history.data || history.data.length < 20} onClick={() => setPage(page + 1)}>Next page</button></div>
   </Frame>;
 }
@@ -42,6 +44,7 @@ export function SavedRunPage() {
         <ReportSections key={data.report.id} report={data.report} />
       </section><p>Source links are the saved URLs; external pages may have changed. Forecast research is not included in this historical snapshot view.</p>
       <RawData label="Full saved report and model configuration" value={data.report} /></>}
+    <PriceHistory snapshots={data.snapshots} />
     {data.snapshots.map(snapshot => <RawData key={snapshot.lane} label={snapshot.lane + " · " + snapshot.status + " · saved at report creation"} value={snapshot} />)}
   </>}</Frame>;
 }

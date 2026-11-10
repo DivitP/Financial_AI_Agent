@@ -36,6 +36,7 @@ from financial_ai.api.schemas import (
     HistoryItem,
 )
 from financial_ai.domain.models import AssetType, Instrument, ResearchRun
+from financial_ai.domain.research_mode import saved_mode
 from financial_ai.llm import validate_chat_configuration
 from financial_ai.llm.providers import create_chat_provider
 from financial_ai.retrieval.index import ResearchIndex
@@ -392,6 +393,7 @@ def create_app(database_path: Path | str | None = None) -> FastAPI:
             version=int(row["version"]),
             as_of=datetime.fromisoformat(row["as_of"]),
             model_configuration=json.loads(row["model_config_json"]),
+            research_mode=saved_mode(row["model_config_json"]),
             decision_brief=json.loads(row["decision_brief_json"]),
             sections=json.loads(row["sections_json"]),
             evidence_links=repository.report_evidence_links(UUID(row["id"])),

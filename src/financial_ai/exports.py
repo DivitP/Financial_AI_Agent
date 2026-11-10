@@ -11,6 +11,7 @@ from PIL import Image as PillowImage
 
 from financial_ai.storage.artifacts import FileSystemArtifactStore
 from financial_ai.storage.history import ResearchHistory
+from financial_ai.domain.research_mode import saved_mode, MODE_NOTICES
 
 
 def export_bundle(database, run_id, version, artifact_root):
@@ -82,6 +83,9 @@ def blocks(bundle):
     yield "title", "Research report"
     yield "text", f"Report {report['id']} | Run {report['run_id']} | Version {report['version']}"
     yield "text", "As of: " + report["as_of"]
+    mode = saved_mode(report.get("model_configuration"))
+    yield "text", "Research mode: " + mode
+    yield "text", MODE_NOTICES[mode]
     yield "heading", "Decision brief"
     for text in report["decision_brief"]:
         yield "text", text

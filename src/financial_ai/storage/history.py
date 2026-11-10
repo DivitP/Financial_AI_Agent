@@ -5,6 +5,7 @@ from contextlib import closing
 from datetime import UTC, datetime
 
 from financial_ai.storage.database import Database
+from financial_ai.domain.research_mode import saved_mode, MODE_NOTICES
 
 
 class ResearchHistory:
@@ -16,7 +17,8 @@ class ResearchHistory:
             rows = db.execute(
                 """SELECT r.id, i.symbol AS ticker, r.status, r.requested_at,
                 m.name, COALESCE(m.archived,0) AS archived,
-                (SELECT COUNT(*) FROM reports p WHERE p.run_id=r.id) AS report_count
+                (SELECT COUNT(*) FROM reports p WHERE p.run_id=r.id) AS report_count,
+                (SELECT model_config_json FROM reports p WHERE p.run_id=r.id ORDER BY version DESC LIMIT 1) AS mode_config
                 FROM research_runs r JOIN instruments i ON i.id=r.instrument_id
                 LEFT JOIN run_history_metadata m ON m.run_id=r.id
                 WHERE (instr(lower(i.symbol),lower(?))>0 OR instr(lower(COALESCE(m.name,'')),lower(?))>0)
@@ -25,7 +27,11 @@ class ResearchHistory:
                 ORDER BY julianday(r.requested_at) DESC, r.id DESC LIMIT ? OFFSET ?""",
                 (q, q, status, status, archive, int(archive == "archived"), limit, offset),
             ).fetchall()
-        return [dict(r) | {"archived": bool(r["archived"])} for r in rows]
+        return [
+            {k: v for k, v in dict(r).items() if k != "mode_config"}
+            | {"archived": bool(r["archived"]), "research_mode": saved_mode(r["mode_config"])}
+            for r in rows
+        ]
 
     def update(self, run_id, fields):
         with self.database.transaction() as db:
@@ -57,10 +63,12 @@ class ResearchHistory:
             versions = [
                 dict(r)
                 for r in db.execute(
-                    "SELECT version, as_of, created_at FROM reports WHERE run_id=? ORDER BY version",
+                    "SELECT version, as_of, created_at, model_config_json FROM reports WHERE run_id=? ORDER BY version",
                     (str(run_id),),
                 )
             ]
+            for item in versions:
+                item["research_mode"] = saved_mode(item.pop("model_config_json"))
             selected = (
                 version if version is not None else versions[0]["version"] if versions else None
             )
@@ -70,7 +78,13 @@ class ResearchHistory:
             if version is not None and report is None:
                 raise KeyError("report version")
             result: dict = {
-                "run": dict(run) | {"archived": bool(run["archived"])},
+                "run": dict(run)
+                | {
+                    "archived": bool(run["archived"]),
+                    "research_mode": saved_mode(report["model_config_json"])
+                    if report
+                    else "unknown",
+                },
                 "versions": versions,
                 "report": None,
                 "snapshots": [],
@@ -83,6 +97,7 @@ class ResearchHistory:
                     "version": report["version"],
                     "as_of": report["as_of"],
                     "model_configuration": json.loads(report["model_config_json"]),
+                    "research_mode": saved_mode(report["model_config_json"]),
                     "decision_brief": json.loads(report["decision_brief_json"]),
                     "sections": json.loads(report["sections_json"]),
                     "evidence_links": {
@@ -107,4 +122,5 @@ class ResearchHistory:
                     )
             else:
                 result["notice"] += " No saved report version exists for this run."
+            result["notice"] += " " + MODE_NOTICES[result["run"]["research_mode"]]
             return result

@@ -3,10 +3,10 @@ export type LaneStatus = "completed" | "failed";
 
 export interface ResearchRun { id: string; status: RunStatus; ticker: string; asset_type?: "equity" | "etf"; correlation_id: string }
 export interface ResearchSnapshot { lane: string; status: LaneStatus; payload: Record<string, unknown> | null; error_message: string | null }
-export interface ResearchReport { id: string; run_id: string; version: number; as_of: string; model_configuration: Record<string, string>; decision_brief: string[]; sections: { title: string; findings: { summary: string; evidence_ids: string[]; limitations?: string[] }[] }[]; evidence_links: Record<string, string> }
+export interface ResearchReport { research_mode?: "synthetic" | "live" | "unknown"; id: string; run_id: string; version: number; as_of: string; model_configuration: Record<string, string>; decision_brief: string[]; sections: { title: string; findings: { summary: string; evidence_ids: string[]; limitations?: string[] }[] }[]; evidence_links: Record<string, string> }
 export interface ResearchRequest { ticker: string; investment_horizon?: string; risk_lens?: string; thesis?: string; include_kronos?: boolean; forecast_horizon?: number }
 export interface ApiFailure extends Error { code?: string; correlationId?: string }
-export interface HistoryItem { id: string; ticker: string; status: RunStatus; requested_at: string; name: string | null; archived: boolean; report_count: number }
+export interface HistoryItem { research_mode?: "synthetic" | "live" | "unknown"; id: string; ticker: string; status: RunStatus; requested_at: string; name: string | null; archived: boolean; report_count: number }
 export interface HistoryView { run: Omit<HistoryItem, "report_count">; versions: { version: number; as_of: string; created_at: string }[]; report: ResearchReport | null; snapshots: ResearchSnapshot[]; notice: string }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {

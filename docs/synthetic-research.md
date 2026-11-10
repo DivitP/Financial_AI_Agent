@@ -2,8 +2,8 @@
 
 This opt-in collector implements the existing `collect(lane, run)` interface and
 uses the replacement pipeline for storage, analysis, reports and retrieval. It
-does not use a network, API keys, LLM, wall clock or random generator. The older
-minimal Compose demo remains unchanged; live collection is never a fallback.
+does not use a network, API keys, LLM, wall clock or random generator. The default
+Compose demo now delegates to this same pipeline; live collection is never a fallback.
 
 Set these in local `.env` for both API and worker, then run the API, React client
 and `uv run python -m financial_ai.workflow.local_worker` as documented in the README:

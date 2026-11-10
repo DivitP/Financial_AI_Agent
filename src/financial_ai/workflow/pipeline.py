@@ -209,6 +209,45 @@ class ResearchPipeline:
                     "synthetic": payload.get("synthetic", False),
                 },
             )
+            # Persist the chart before the report captures its immutable snapshot manifest.
+            import io
+            from matplotlib.figure import Figure
+
+            figure = Figure(figsize=(7, 3))
+            axis = figure.subplots()
+            axis.plot([p.timestamp for p in points], [p.close for p in points])
+            title = (
+                "SYNTHETIC SAMPLE - " if payload.get("synthetic") else ""
+            ) + "Historical closing prices"
+            axis.set(
+                title=title,
+                ylabel=payload.get("currency", "Currency unavailable"),
+                xlabel="Observation date",
+            )
+            figure.autofmt_xdate()
+            figure.tight_layout()
+            image = io.BytesIO()
+            figure.savefig(image, format="png")
+            artifact_id = self.artifacts.put_bytes(
+                image.getvalue(), category="charts", suffix=".png"
+            )
+            self.repository.upsert_snapshot(
+                self.run_id,
+                "charts",
+                "completed",
+                {
+                    "synthetic": payload.get("synthetic", False),
+                    "charts": [
+                        {
+                            "artifact_id": artifact_id,
+                            "title": title,
+                            "evidence_ids": [payload["evidence_id"]],
+                            "adjustment_policy": payload.get("adjustment_policy", "unknown"),
+                            "as_of": payload.get("as_of", "unknown"),
+                        }
+                    ],
+                },
+            )
 
     def report(self):
         from contextlib import closing
@@ -256,6 +295,17 @@ class ResearchPipeline:
                 )
             ]
         composer = EvidenceBackedReportComposer()
+        mode = (
+            "synthetic"
+            if evidence and all(r["source_tier"] == "synthetic" for r in evidence)
+            else "live"
+            if evidence
+            and all(
+                r["provider"] in {"yahoo", "sec", "rss"} and r["source_tier"] != "synthetic"
+                for r in evidence
+            )
+            else "unknown"
+        )
         previous = self.repository.latest_report(self.run_id)
         report = composer.compose(
             run_id=self.run_id,
@@ -263,7 +313,11 @@ class ResearchPipeline:
             evidence_links=links,
             as_of=datetime.now(UTC),
             version=int(previous["version"]) + 1 if previous else 1,
-            model_config={"composer": "extractive-pipeline-v1", "llm": "disabled"},
+            model_config={
+                "composer": "extractive-pipeline-v1",
+                "llm": "disabled",
+                "research_mode": mode,
+            },
         )
         composer.persist(report, self.repository)
         if failures:

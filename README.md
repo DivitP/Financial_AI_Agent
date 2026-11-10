@@ -104,7 +104,9 @@ See [remaining gates](docs/replacement-workflow.md#remaining-retirement-gates).
 
 For coherent invented quotes, history, financial facts and inspectable local
 source records, opt into the [deterministic synthetic collector](docs/synthetic-research.md).
-It is separate from the minimal Compose demo and never uses live providers.
+The default Compose demo uses this same pipeline and never calls live providers.
+It generates findings, indexed evidence and a saved chart/report. [Research mode](docs/research-mode.md)
+is preserved in report versions, history and exports; older records explicitly show unknown mode.
 
 Generate desktop/mobile captures with `make release-eval` after browser setup
 below. The [screenshot review guide](docs/screenshots.md) identifies the files,

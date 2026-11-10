@@ -44,9 +44,11 @@ def test_demo_handler_persists_explicit_nonfinancial_output(tmp_path):
     job = app.state.runner.run(UUID(created["id"]), handler(app.state.repository, run_id))
     assert job.status == "completed"
     snapshots = app.state.repository.snapshots(run_id)
-    assert len(snapshots) == 5
-    assert all("OFFLINE DEMO" in row["payload_json"] for row in snapshots)
-    assert all('"price"' not in row["payload_json"] for row in snapshots)
+    lanes = {row["lane"]: json.loads(row["payload_json"]) for row in snapshots}
+    assert lanes["quote"]["price"] == lanes["ohlcv"]["candles"][-1]["close"]
+    assert lanes["fundamentals"]["metrics"]["gross_margin"]["display"] == "39.0%"
+    assert lanes["charts"]["charts"][0]["artifact_id"].startswith("charts_")
+    assert app.state.repository.latest_report(run_id) is not None
 
 
 def test_worker_health_rejects_absent_and_stale_heartbeats(tmp_path, monkeypatch):
@@ -68,7 +70,17 @@ def test_smoke_checks_completion_and_rejects_failed_or_stuck_runs(monkeypatch, s
         assert timeout == 5
         data: object = {"id": "demo", "status": state}
         if request.full_url.endswith("snapshot"):
-            data = [{"payload": {"provider": "offline-demo"}}] * 5
+            data = [
+                {"lane": "quote", "payload": {"synthetic": True}},
+                {"lane": "ohlcv", "payload": {"candles": [1] * 60}},
+                {"lane": "charts", "payload": {"charts": ["fixture"]}},
+            ]
+        if request.full_url.endswith("reports/latest"):
+            data = {
+                "research_mode": "synthetic",
+                "sections": ["fixture"],
+                "evidence_links": {"id": "url"},
+            }
         return io.BytesIO(json.dumps(data).encode())
 
     monkeypatch.setattr("financial_ai.ops.urllib.request.urlopen", response)
