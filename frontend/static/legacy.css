@@ -39,3 +39,7 @@ img { max-width: 100%; height: auto; }
 #statusBar { padding: .75rem; background: #edf6f3; border-radius: .4rem; }
 @media (max-width: 600px) { body { padding: 1rem .65rem; } form > label, form > button { width: 100%; } th, td { padding: .65rem; } .assumption-grid { grid-template-columns: 1fr; } }
 @media print { body { background: #fff; } form, #askForm, button { display: none; } section { box-shadow: none; } .report-table { overflow: visible; } }
+
+#answerContainer article { margin: 1rem 0; padding: 1rem; border: 1px solid #d8dee8; border-radius: .5rem; }
+#answerContainer blockquote { margin: .75rem 0; padding-left: 1rem; border-left: 3px solid #718096; }
+#answerContainer small { display: block; margin-top: .5rem; overflow-wrap: anywhere; }

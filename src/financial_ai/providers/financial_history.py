@@ -307,6 +307,9 @@ def collect_sec(ticker, settings, store, retrieved_at, profile, *, http=None):
     history = normalize_sec(payload, retrieved_at, evidence, filings)
     history.issuer, history.issuer_id = submissions.get("name"), cik
     history.filings = filings[:5]
+    periodic = next((f for f in filings if f["form"] in {"10-Q", "10-K"}), None)
+    if periodic and periodic not in history.filings:
+        history.filings.append(periodic)
     return history
 
 

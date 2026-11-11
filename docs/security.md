@@ -105,3 +105,14 @@ actual browser execution attempts. No live providers or credentials are needed.
 
 References: [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html),
 [Bleach HTML sanitization](https://bleach.readthedocs.io/en/latest/clean.html).
+
+The Flask source-body reader uses the separate explicit `ARTICLE_ALLOWED_HOSTS`
+list and checks publisher robots policy before every redirected destination.
+It accepts no cookies or login credentials and does not bypass subscription or
+consent restrictions. Article downloads are capped at 2 MB; SEC filings at 8 MB
+for inline-XBRL markup. Extracted text is bounded to 40,000 article characters or
+500,000 filing characters; these are excerpts of a source, not a guarantee of
+complete document coverage. Filing text scanning uses overlapping bounded views
+before parsing body paragraphs, leaf divs and table rows. Hidden instruction
+patterns still quarantine a source. Follow-up citations are constructed from
+immutable, report-and-ticker-scoped passages, never model-supplied URLs.

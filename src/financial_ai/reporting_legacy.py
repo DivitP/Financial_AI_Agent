@@ -45,7 +45,14 @@ def source_note(record: LiveRecord, artifact: str) -> str:
 
 
 def build_live_research(
-    ticker: str, persist_dir: str, *, provider=None, settings=None, assumptions=None
+    ticker: str,
+    persist_dir: str,
+    *,
+    provider=None,
+    settings=None,
+    assumptions=None,
+    scope=None,
+    reader=None,
 ):
     """Collect independent sources once, retain exact records, then render facts.
 
@@ -56,8 +63,14 @@ def build_live_research(
     from financial_ai.providers.financial_history import collect_history
     from financial_ai.analysis.research_assessment import ValuationAssumptions
     from financial_ai.reporting_assessment import render_assessment
+    from financial_ai.report_sources import collect_report_sources
+    from financial_ai.storage.report_evidence import ReportEvidenceStore
 
     ticker = symbol(ticker)
+    own_scope = scope is None
+    if own_scope:
+        repository = ReportEvidenceStore(Path(persist_dir) / "report_evidence.sqlite3")
+        scope = (repository, repository.create(ticker))
     provider = provider or LegacyLiveProvider(settings or get_settings())
     calls = {
         "quote": lambda: provider.quote(ticker),
@@ -86,7 +99,7 @@ def build_live_research(
     lines = [
         f"### {text(p.get('companyName') or q.get('name') or ticker)} ({ticker})",
         "",
-        "A source-backed snapshot of company financials and recent headlines. For research and education.",
+        "A source-backed snapshot of company financials and readable original sources. For research and education.",
         "",
         "### Market snapshot",
         "",
@@ -137,26 +150,18 @@ def build_live_research(
     ]
     lines += [f"- {text(notice)}" for notice in dict.fromkeys(notices)]
     news = records["news"]
-    news_lines = [
-        "### Recent headlines",
-        "",
-        source_note(news, artifacts["news"]),
-        "",
-        "Discovery only: headlines and publication metadata, not verified article bodies "
-        "or a sentiment conclusion. Feed results can include related companies. "
-        "Check publication dates; retrieval time does not establish freshness.",
-        "",
-    ]
-    for article in news.data:
-        # The collector has validated URLs. Do not execute or fetch linked content here.
-        news_lines += [
-            f"- [{text(article['title'])}]({article['url']}) — "
-            f"published {text(article.get('publishedDate'))}."
-        ]
-    if not news.data:
-        news_lines += [text(news.issue)]
-    news_lines += ["", *[f"- Source fallback: {text(n)}" for n in news.notices]]
     assumptions = assumptions or ValuationAssumptions()
+    source_text, read_urls = collect_report_sources(
+        ticker,
+        history,
+        records,
+        artifacts,
+        store,
+        scope,
+        reader=reader,
+        settings=provider.settings,
+        assumptions=assumptions,
+    )
     store.put_text(
         json.dumps(
             dict(
@@ -174,8 +179,13 @@ def build_live_research(
     history_sources = list(
         dict.fromkeys(f.url for w in history.annual + history.interim for f in w.facts.values())
     )
-    return [
-        ("research", "\n".join(news_lines), [news.url]),
+    results = [
+        ("research", source_text, read_urls),
         ("fundamental", "\n".join(lines), [r.url for name, r in records.items() if name != "news"]),
         ("assessment", assessment, history_sources + [quote.url, profile.url]),
     ]
+    if own_scope:
+        scope[0].finalize(
+            scope[1], ticker, "\n\n".join(r[1] for r in results), assumptions.model_dump()
+        )
+    return results

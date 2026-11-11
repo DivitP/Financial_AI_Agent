@@ -16,10 +16,13 @@ class UnsafeDestination(ValueError):
 
 
 class SafeTransport:
-    def __init__(self, hosts, *, resolver=socket.getaddrinfo, max_redirects=2):
+    def __init__(
+        self, hosts, *, resolver=socket.getaddrinfo, max_redirects=2, return_redirects=False
+    ):
         self.hosts = frozenset(hosts)
         self.resolver = resolver
         self.max_redirects = max_redirects
+        self.return_redirects = return_redirects
         if not self.hosts or any(
             not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", h) for h in self.hosts
         ):
@@ -106,6 +109,10 @@ class SafeTransport:
                 )
                 response = connection.getresponse()
                 if response.status in (301, 302, 303, 307, 308):
+                    if self.return_redirects:
+                        # Callers that explicitly handle redirects must recheck
+                        # destination policy (including robots) before another GET.
+                        return HttpResponse(response.status, dict(response.getheaders()), b"")
                     location = response.getheader("Location")
                     if hop == self.max_redirects or not location:
                         raise UnsafeDestination("Document redirect limit exceeded")

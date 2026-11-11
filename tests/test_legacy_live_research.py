@@ -257,7 +257,11 @@ def test_report_is_built_only_from_records_with_periods_sources_and_safe_tables(
     markdown = "\n".join(part[1] for part in report)
     assert "1,000.00" in markdown and "Net income" in markdown
     assert "2026-01-31" in markdown and "2026-02-25" in markdown
-    assert "subscription restricted" in markdown and "publisher.test/nvda" in markdown
+    assert (
+        "subscription restricted" in markdown
+        and "Not read: host_not_allowed"
+        in BeautifulSoup(sanitized_markdown(markdown), "html.parser").get_text()
+    )
     assert "Strong Buy" not in markdown and "partial allocation" not in markdown
     page = BeautifulSoup(sanitized_markdown(markdown), "html.parser")
     assert len(page.select("table")) >= 3
@@ -316,3 +320,34 @@ def test_markdown_tables_keep_formatting_without_allowing_html_execution():
     page = BeautifulSoup(result, "html.parser")
     assert page.select_one(".report-table[tabindex='0'] strong").text == "100"
     assert "onclick" not in result and "onerror" not in result and "<img" not in result
+
+
+def test_report_reads_article_and_indexes_passages_in_its_own_snapshot(tmp_path):
+    from financial_ai.providers.article_reader import ReadArticle
+    from financial_ai.storage.report_evidence import ReportEvidenceStore
+    from types import SimpleNamespace
+
+    reader = SimpleNamespace(
+        read=lambda item, **kwargs: ReadArticle(
+            item["url"],
+            "NVIDIA original article",
+            "2026-11-10",
+            "2026-11-11",
+            status="read",
+            classification="publisher-labelled analysis",
+            paragraphs=["NVIDIA demand increased while spending returns remain uncertain. " * 10],
+            raw_html="<article>Original source body</article>",
+        )
+    )
+    store = ReportEvidenceStore(tmp_path / "report_evidence.sqlite3")
+    ident = store.create("NVDA")
+    parts = build_live_research(
+        "NVDA", str(tmp_path), provider=collector(tmp_path), reader=reader, scope=(store, ident)
+    )
+    store.finalize(ident, "NVDA", "report")
+    markdown = "\n".join(p[1] for p in parts)
+    assert "Read from source" in markdown and "publisher-labelled analysis" in markdown
+    assert "NVIDIA demand increased" in markdown
+    passages = store.search(ident, "NVDA", "spending returns", news=True)
+    assert passages and passages[0]["url"] == "https://publisher.test/nvda"
+    assert passages[0]["evidence_id"]

@@ -13,24 +13,36 @@ document.querySelector("#askForm").addEventListener("submit", async event => {
   event.preventDefault();
   const container = document.querySelector("#answerContainer");
   container.replaceChildren();
+  const button = event.currentTarget.querySelector("button");
+  button.disabled = true;
+  appendText(container, "p", "Checking this report’s source passages…");
   try {
     const response = await fetch("/api/ask", { method: "POST",
       headers: { "Content-Type": "application/json", "X-Requested-With": "FinancialAI" },
       body: JSON.stringify({ ticker: document.querySelector("#tickerHidden").value,
+        report_id: document.querySelector("#reportHidden").value,
         question: document.querySelector("#questionInput").value }) });
-    if (!response.ok) throw new Error("Request failed");
     const data = await response.json();
-    appendText(container, "pre", data.answer);
-    for (const source of data.sources ?? []) {
+    if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "Request failed");
+    container.replaceChildren();
+    appendText(container, "p", data.answer);
+    for (const claim of data.claims ?? []) {
+      const article = document.createElement("article");
+      container.append(article);
+      appendText(article, "strong", claim.classification);
+      appendText(article, "blockquote", claim.quote);
+      const source = claim.url;
       if (typeof source !== "string" || /[\u0000-\u0020\u007f\\]/.test(source) || !/^https?:\/\//i.test(source)) continue;
       try {
         const url = new URL(source);
         if (!["https:", "http:"].includes(url.protocol) || url.username || url.password) continue;
-        const link = appendText(container, "a", source);
+        const link = appendText(article, "a", claim.title || source);
         link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+        appendText(article, "small", " · Published " + (claim.published_at || "date unavailable") + " · Passage " + claim.passage_id);
       } catch { /* Invalid source links are not interactive. */ }
     }
-  } catch { appendText(container, "p", "Unable to answer. Please retry."); }
+  } catch (error) { container.replaceChildren(); appendText(container, "p", error.message || "Unable to answer. Please retry."); }
+  finally { button.disabled = false; }
 });
 const task = document.body.dataset.taskId;
 async function poll() {

@@ -10,15 +10,15 @@ def test_api_ask_returns_json_from_mocked_rag(import_frontend, monkeypatch) -> N
     monkeypatch.setattr(frontend, "get_vectorstore", lambda _path: object())
     monkeypatch.setattr(
         frontend,
-        "answer_question_with_rag",
-        lambda _store, ticker, question, k: {
+        "ask_selected_report",
+        lambda _path, ticker, _report, question, _settings: {
             "answer": f"{ticker}: {question}",
             "sources": ["https://example.com/evidence"],
         },
     )
 
     response = frontend.app.test_client().post(
-        "/api/ask", json={"ticker": "AAPL", "question": "What changed?"}
+        "/api/ask", json={"ticker": "AAPL", "question": "What changed?", "report_id": "selected"}
     )
 
     assert response.status_code == 200
@@ -114,7 +114,7 @@ def test_groq_failure_shows_safe_actionable_page(
         raise error
 
     monkeypatch.setattr(frontend, "run_research_and_fundamental_agents", fail)
-    monkeypatch.setattr(frontend, "answer_question_with_rag", fail)
+    monkeypatch.setattr(frontend, "ask_selected_report", fail)
     monkeypatch.setattr(frontend, "get_vectorstore", lambda _path: object())
     client = frontend.app.test_client()
     client.get("/")
@@ -127,3 +127,65 @@ def test_groq_failure_shows_safe_actionable_page(
     assert 'role="alert"' in result.text
     assert 'action="/run"' in result.text
     assert result.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_followup_requires_explicit_report_scope(import_frontend):
+    client = import_frontend.app.test_client()
+    assert (
+        client.post("/api/ask", json={"ticker": "GOOG", "question": "What news?"}).status_code
+        == 400
+    )
+    response = client.post(
+        "/api/ask", json={"ticker": "GOOG", "question": "What news?", "report_id": "bad"}
+    )
+    assert response.status_code == 404
+    assert "sources" not in response.get_json()
+
+
+def test_native_followup_reopens_selected_report_and_escapes_source_text(
+    import_frontend, monkeypatch, tmp_path
+):
+    from financial_ai.storage.report_evidence import ReportEvidenceStore
+
+    frontend = import_frontend
+    monkeypatch.setattr(
+        frontend, "settings", frontend.settings.model_copy(update={"persist_dir": tmp_path})
+    )
+    store = ReportEvidenceStore(tmp_path / "report_evidence.sqlite3")
+    ident = store.create("GOOG")
+    store.finalize(ident, "GOOG", "# Preserved selected report")
+    monkeypatch.setattr(
+        frontend,
+        "ask_selected_report",
+        lambda *args: dict(
+            answer="Verified excerpt",
+            claims=[
+                dict(
+                    classification="publisher-labelled opinion",
+                    quote="<script>alert(1)</script>",
+                    url="https://publisher.test/article",
+                    title="Original article",
+                    passage_id="exact-passage",
+                    published_at=None,
+                )
+            ],
+        ),
+    )
+    client = frontend.app.test_client()
+    client.get("/")
+    with client.session_transaction() as session:
+        token = session["csrf_token"]
+    result = client.post(
+        "/ask",
+        data={
+            "ticker": "GOOG",
+            "report_id": ident,
+            "question": "What does the article say?",
+            "csrf_token": token,
+        },
+    )
+    assert result.status_code == 200
+    html = result.get_data(as_text=True)
+    assert "Preserved selected report" in html and ident in html
+    assert "&lt;script&gt;" in html and "<script>alert(1)</script>" not in html
+    assert "Original article" in html and "exact-passage" in html

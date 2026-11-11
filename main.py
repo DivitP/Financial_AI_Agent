@@ -353,7 +353,11 @@ def build_report(results: List[AgentResult], include_sources: bool = True) -> st
 def run_research_and_fundamental_agents(ticker: str, persist_dir: str = "./chroma_db", assumptions=None) -> Dict[str, Any]:
     """Collect source-backed facts for the Flask interface before any optional Q&A."""
     from financial_ai.reporting_legacy import build_live_research
-    options = {}
+    from financial_ai.storage.report_evidence import ReportEvidenceStore
+    from pathlib import Path
+    repository = ReportEvidenceStore(Path(persist_dir) / "report_evidence.sqlite3")
+    report_id = repository.create(ticker)
+    options = {"scope": (repository, report_id)}
     if assumptions is not None:
         from financial_ai.analysis.research_assessment import ValuationAssumptions
         options["assumptions"] = ValuationAssumptions.model_validate(assumptions)
@@ -362,8 +366,11 @@ def run_research_and_fundamental_agents(ticker: str, persist_dir: str = "./chrom
     results.sort(key=lambda result: {"assessment": 0, "fundamental": 1, "research": 2}.get(result.name, 3))
     vs = get_source_vectorstore(persist_dir)
     upsert_results_to_vectorstore(vs, results)
+    markdown = build_report(results, include_sources=False)
+    repository.finalize(report_id, ticker, markdown, assumptions)
     return {
-        "report_md": build_report(results, include_sources=False),
+        "report_md": markdown,
+        "report_id": report_id,
         "vectorstore": vs,
     }
 
@@ -393,53 +400,17 @@ def run_all_agents_and_store(ticker: str, persist_dir: str = "./chroma_db") -> D
     }
 
 
-def answer_question_with_rag(vs: SimpleSQLiteVectorStore, ticker: str, question: str, k: int = 6) -> Dict[str, Any]:
-    from financial_ai.data.documents import document_envelope, UnsafeDocument, UNTRUSTED_POLICY
-    contexts = retrieve_context(vs, ticker, question, k=k)
-    context_blocks = []
-    aggregated_sources: List[str] = []
-    for c in contexts:
-        meta = c.get("metadata", {})
-        srcs = meta.get("sources", []) or []
-        aggregated_sources.extend(srcs)
-        snippet = c.get("content", "")
-        agent = meta.get("agent", "unknown")
-        try:
-            context_blocks.append(document_envelope(f"[Agent={agent}]\n{snippet}"))
-        except UnsafeDocument:
-            continue
-
-    system = (
-        "You are a financial analysis assistant. Answer the user's question strictly using the provided context excerpts. "
-        "Distinguish reported facts, calculated metrics and illustrative valuation assumptions. "
-        "Cite the exact source URLs and evidence identifiers supplied in the excerpts; agent names are not citations. "
-        "Do not describe scenario assumptions as forecasts, invent missing values or offer personalized allocation, buy or sell instructions. "
-        "If the answer is not supported by the context, say you don't have enough information."
-    )
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system + "\n" + UNTRUSTED_POLICY),
-        ("human", "Ticker: {ticker}\nQuestion: {question}\n\nContext:\n{context}\n\nAnswer concisely and include citations."),
-    ])
-
-    settings = get_settings()
-    llm = ChatGroq(
-        temperature=0,
-        groq_api_key=settings.groq_api_key.get_secret_value() if settings.groq_api_key else None,
-        model_name=settings.groq_model,
-    )
-    messages = prompt.format_messages(ticker=ticker, question=question, context="\n\n".join(context_blocks))
-    ai_msg = llm.invoke(messages)
-    answer_text = getattr(ai_msg, "content", str(ai_msg))
-
-    # Unique sources preserving order
-    seen = set()
-    dedup_sources = []
-    for s in aggregated_sources:
-        if s not in seen:
-            dedup_sources.append(s)
-            seen.add(s)
-
-    return {"answer": answer_text, "sources": dedup_sources, "contexts": contexts}
+def answer_question_with_rag(vs: SimpleSQLiteVectorStore, ticker: str, question: str, k: int = 6, *, report_id=None) -> Dict[str, Any]:
+    """Compatibility entry point: unscoped historical indexes are never answer evidence."""
+    from financial_ai.storage.report_evidence import ReportScopeError
+    from financial_ai.retrieval.report_qa import ask_selected_report
+    from pathlib import Path
+    if not report_id:
+        raise ReportScopeError("Generate a new report and pass its report_id before asking questions.")
+    directory = Path(vs.db_path).parent
+    if directory.name == "source_grounded":
+        directory = directory.parent
+    return ask_selected_report(directory, ticker, report_id, question, get_settings())
 
 
 if __name__ == "__main__":

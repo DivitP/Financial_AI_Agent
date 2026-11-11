@@ -141,3 +141,46 @@ review are separate and never establish investment accuracy or forecast validity
 Provider contracts: [SEC APIs](https://www.sec.gov/search-filings/edgar-application-programming-interfaces),
 [SEC access policy](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data),
 [FMP documentation](https://site.financialmodelingprep.com/developer/docs).
+
+## Reading sources and scoped follow-ups (Flask compatibility UI)
+
+New reports fetch up to three discovered article destinations and one original
+SEC filing from verified issuer submissions. The reader extracts semantic body
+paragraphs, not RSS titles. It retains the downloaded HTML as a local evidence
+artifact and indexes body passages with stable IDs. Publisher JSON-LD or section
+metadata labels reporting, analysis, opinion or sponsored content; absent labels
+remain unclassified. An issuer filing is labelled separately. These labels do
+not independently verify the contents.
+
+`ARTICLE_ALLOWED_HOSTS` controls explicit reviewed HTTPS destinations. Each
+redirect must pass the host, public-address and publisher robots checks; SEC
+filing redirects cannot change the verified filing path. Collection is bounded
+by response size, timeout, redirect and concurrency limits. The reader does not
+execute JavaScript, log in, bypass paywalls or treat consent pages as articles.
+Disallowed, blocked, gated, unrelated, quarantined and insufficient bodies are
+shown as **Not read** and never indexed as article evidence. A robots permission
+is an access control check, not a grant of content reuse rights. Review each
+publisher's terms before adding hosts. Only short excerpts are displayed.
+
+Each report receives an immutable UUID snapshot in the local
+`report_evidence.sqlite3`. Follow-ups require both that ID and its ticker.
+Filtering happens in SQL before passage ranking; there is no fallback to old
+mixed indexes, another company or a more recent report of the same company.
+Older pages must be regenerated to obtain source bodies and a report ID.
+Background technical charts do not modify the finalized evidence snapshot.
+
+The optional model selects up to three exact excerpts. The server verifies each
+ID, quote substring and cumulative source quote budget, then constructs citation
+links from saved metadata. Only used sources are displayed, with source labels,
+publication dates when supplied and passage IDs. Invented prose, URLs, quotes or
+extra response fields fail verification. Article excerpts are capped at 24 words
+per URL per answer; filings and financial data at 120. This extractive answer
+format demonstrates provenance; it does not prove a publisher claim is true or
+that an excerpt answers every aspect of a question. Unsupported questions are
+explicitly marked. Published author views do not establish public sentiment.
+
+Test the offline reader, cross-report isolation and citation failures with:
+
+```bash
+uv run pytest tests/test_article_reading.py tests/test_document_security.py tests/test_legacy_live_research.py tests/test_frontend.py --no-cov
+```

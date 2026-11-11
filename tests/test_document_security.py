@@ -223,3 +223,11 @@ def test_old_poisoned_index_never_reaches_model(tmp_path, monkeypatch):
     assert result["status"] == "insufficient_evidence"
     assert "quarantined" in result["warnings"][0]
     app.state.qa.provider.complete.assert_not_called()
+
+
+def test_redirect_can_be_returned_for_caller_policy_checks():
+    transport, connections = fixture_transport([response(302, {"Location": "/next"})])
+    transport.return_redirects = True
+    result = transport(HttpRequest("article", "https://approved.test/"), 5, 100)
+    assert result.status_code == 302 and result.headers["Location"] == "/next"
+    assert result.body == b"" and len(connections) == 1

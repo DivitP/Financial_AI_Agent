@@ -25,8 +25,12 @@
 <section><h2>Ask follow-up</h2><form id="askForm" action="/ask" method="post">
 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 <input id="tickerHidden" type="hidden" name="ticker" value="{{ ticker or '' }}">
-<label>Your question<textarea id="questionInput" name="question" required></textarea></label><button>Ask</button></form>
+<input id="reportHidden" type="hidden" name="report_id" value="{{ report_id or '' }}">
+<label>Your question<textarea id="questionInput" name="question" minlength="3" maxlength="1000" required></textarea></label><button {% if not report_id %}disabled{% endif %}>Ask</button></form>
+<p class="muted">{% if report_id %}Answers use only the sources captured for this {{ ticker }} report.{% else %}Generate a report first to ask about its sources.{% endif %}</p>
 <div id="answerContainer" role="status"></div></section>
-{% if answer %}<pre>{{ answer }}</pre>{% for source in sources or [] %}
-{% if safe_link(source) %}<a href="{{ safe_link(source) }}" rel="noopener noreferrer" target="_blank">{{ source }}</a>{% endif %}
-{% endfor %}{% endif %}</main></body></html>
+{% if answer %}<section aria-label="Source-backed answer"><p>{{ answer }}</p>{% for claim in claims or [] %}
+<article><p><strong>{{ claim.classification }}</strong></p><blockquote>{{ claim.quote }}</blockquote>
+{% if safe_link(claim.url) %}<a href="{{ safe_link(claim.url) }}" rel="noopener noreferrer" target="_blank">{{ claim.title }}</a>{% endif %}
+<small> · Published {{ claim.published_at or 'date unavailable' }} · Passage {{ claim.passage_id }}</small></article>
+{% endfor %}</section>{% endif %}</main></body></html>

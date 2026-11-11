@@ -47,7 +47,9 @@ def test_research_and_fundamental_run_persists_offline_results(
     )
     monkeypatch.setattr(
         "financial_ai.reporting_legacy.build_live_research",
-        lambda _ticker, _path: [(r.name, r.content, r.sources) for r in (search, fundamental)],
+        lambda _ticker, _path, **_kwargs: [
+            (r.name, r.content, r.sources) for r in (search, fundamental)
+        ],
     )
 
     output = main.run_research_and_fundamental_agents("AAPL", str(tmp_path / "runtime"))
@@ -105,40 +107,9 @@ def test_technical_analysis_flow_uses_agent_summary_and_images(import_main, monk
     assert "<<IMAGE:FORECAST>>" in result.content
 
 
-def test_rag_answer_uses_retrieved_context_and_deduplicates_sources(
-    import_main, monkeypatch
-) -> None:
-    main = import_main
-    document = main.Document(
-        page_content="AAPL reported revenue growth.",
-        metadata={"agent": "fundamental", "sources": ["https://example.com/filing"]},
-    )
+def test_unscoped_legacy_rag_is_refused(import_main):
+    import pytest
+    from financial_ai.storage.report_evidence import ReportScopeError
 
-    class FakeVectorStore:
-        def similarity_search_with_relevance_scores(self, _query, k):
-            assert k == 6
-            return [(document, 0.9), (document, 0.8)]
-
-    class FakeChatGroq:
-        def __init__(self, **_kwargs):
-            assert _kwargs["model_name"] == "fixture-configured-model"
-            assert _kwargs["groq_api_key"] == "test-groq-key"
-
-        def invoke(self, _messages):
-            return SimpleNamespace(content="Answer grounded in the filing.")
-
-    monkeypatch.setattr(main, "ChatGroq", FakeChatGroq)
-    from pydantic import SecretStr
-
-    monkeypatch.setattr(
-        main,
-        "get_settings",
-        lambda: SimpleNamespace(
-            groq_model="fixture-configured-model", groq_api_key=SecretStr("test-groq-key")
-        ),
-    )
-
-    answer = main.answer_question_with_rag(FakeVectorStore(), "AAPL", "How is revenue?", k=6)
-
-    assert answer["answer"] == "Answer grounded in the filing."
-    assert answer["sources"] == ["https://example.com/filing"]
+    with pytest.raises(ReportScopeError, match="report_id"):
+        import_main.answer_question_with_rag(object(), "GOOG", "What news?")

@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import uuid
+import json
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 import base64
@@ -21,6 +22,9 @@ if ROOT_DIR not in sys.path:
 
 from main import run_research_and_fundamental_agents, get_source_vectorstore as get_vectorstore, answer_question_with_rag, upsert_results_to_vectorstore
 from settings import get_settings
+from financial_ai.retrieval.report_qa import ask_selected_report
+from financial_ai.storage.report_evidence import ReportEvidenceStore, ReportScopeError
+from pathlib import Path
 
 load_dotenv()
 
@@ -60,6 +64,13 @@ def security_headers(response):
 def safe_http_error(error):
     return jsonify(error=error.name), error.code
 
+@app.errorhandler(ReportScopeError)
+def missing_report_scope(error):
+    message = "Generate or reopen a report for this ticker before asking about its sources. Older pages without a report ID must be regenerated."
+    if request.path.startswith('/api/'):
+        return jsonify(error=message), 404
+    return render_template(INDEX_HTML, error=message, ticker=""), 404
+
 @app.errorhandler(APIError)
 def safe_groq_error(error):
     # Provider error bodies can contain prompts or credentials; never render them.
@@ -71,6 +82,8 @@ def safe_groq_error(error):
         message = "Groq's request or token limit was reached. Wait before retrying and check your account limits."
     else:
         message = "Groq could not complete this request. Check the provider status and your configuration before retrying."
+    if request.path.startswith('/api/'):
+        return jsonify(error=message), 503
     return render_template(INDEX_HTML, error=message, ticker=""), 503
 
 # Global storage for background tasks
@@ -312,7 +325,8 @@ def run_agents():
         text_report_html=text_report_html,
         ticker=ticker,
         task_id=task_id,
-        valuation_options=options.model_dump()
+        valuation_options=options.model_dump(),
+        report_id=out.get("report_id")
     )
 
 @app.route("/ask", methods=["POST"]) 
@@ -321,41 +335,41 @@ def ask():
     question = (request.form.get("question") or "").strip()
     if not question:
         return render_template(INDEX_HTML, report=None, ticker=ticker, answer="Please enter a question.")
+    if not 3 <= len(question) <= 1000:
+        return render_template(INDEX_HTML, report=None, ticker=ticker, answer="Enter a question between 3 and 1000 characters."), 422
 
-    vs = get_vectorstore(str(settings.persist_dir))
-    rag = answer_question_with_rag(vs, ticker, question, k=6)
-    return render_template(INDEX_HTML, report=None, ticker=ticker, answer=rag["answer"], sources=rag.get("sources", []))
+    report_id = request.form.get("report_id", "")
+    rag = ask_selected_report(settings.persist_dir, ticker, report_id, question, settings)
+    saved = ReportEvidenceStore(Path(settings.persist_dir) / "report_evidence.sqlite3").report(report_id, ticker)
+    return render_template(INDEX_HTML, report=True, text_report_html=sanitized_markdown(saved["markdown"]),
+                           ticker=ticker, report_id=report_id, answer=rag["answer"],
+                           claims=rag.get("claims", []), valuation_options=json.loads(saved["options"]))
 
 @app.route('/api/ask', methods=['POST'])
 def api_ask():
     try:
         # Get JSON data with better error handling
         data = request.get_json()
-        if not data:
+        if not isinstance(data, dict) or not data:
             return jsonify({"error": "No JSON data provided"}), 400
             
-        ticker = (data.get('ticker') or '').strip().upper()
-        question = (data.get('question') or '').strip()
+        if any(not isinstance(data.get(key), str) for key in ('ticker', 'question', 'report_id')):
+            return jsonify(error="Ticker, report ID and question are required text fields."), 400
+        ticker = data['ticker'].strip().upper()
+        question = data['question'].strip()
         
         if not question:
             return jsonify({"error": "Missing question"}), 400
             
         if not ticker:
             return jsonify({"error": "Missing ticker"}), 400
-        # Get vectorstore and perform RAG
-        vs = get_vectorstore(str(settings.persist_dir))
-        rag = answer_question_with_rag(vs, ticker, question, k=6)
-        
-        # Ensure we return valid JSON
-        response_data = {
-            "answer": rag.get("answer", "No answer available"),
-            "sources": rag.get("sources", [])
-        }
-        
-        print(f"API Ask Response: {len(response_data['answer'])} chars, {len(response_data['sources'])} sources")
-        
-        return jsonify(response_data)
-        
+        return jsonify(ask_selected_report(settings.persist_dir, ticker, data['report_id'], question, settings))
+    except ReportScopeError:
+        raise
+    except APIError:
+        raise
+    except ValueError:
+        return jsonify(error="Enter a valid report scope and a question between 3 and 1000 characters."), 400
     except Exception:
         return jsonify({"error": "Unable to answer the question."}), 500
 

@@ -66,6 +66,27 @@ class Settings(BaseSettings):
         default=["www.sec.gov", "data.sec.gov", "api.gdeltproject.org"],
         validation_alias="DOCUMENT_ALLOWED_HOSTS",
     )
+    article_allowed_hosts: list[str] = Field(
+        default=[
+            "finance.yahoo.com",
+            "www.fool.com",
+            "www.benzinga.com",
+            "www.sec.gov",
+            "abc.xyz",
+            "investor.nvidia.com",
+            "nvidianews.nvidia.com",
+        ],
+        validation_alias="ARTICLE_ALLOWED_HOSTS",
+    )
+
+    @field_validator("article_allowed_hosts")
+    @classmethod
+    def valid_article_hosts(cls, values: list[str]) -> list[str]:
+        import re
+
+        if not values or any(not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", h) for h in values):
+            raise ValueError("ARTICLE_ALLOWED_HOSTS requires explicit lowercase hostnames")
+        return list(dict.fromkeys(values))
 
     persist_dir: Path = Field(
         default=Path("data/runtime"),
