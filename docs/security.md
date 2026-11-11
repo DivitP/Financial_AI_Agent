@@ -43,8 +43,16 @@ Run the offline adversarial suite:
 Policy references: [OWASP SSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
 and [OWASP prompt-injection prevention](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html).
 
-Both API and legacy Flask responses carry CSP, nosniff, anti-framing, no-referrer,
-and restricted permissions headers. HTTPS responses also carry HSTS. Debug and the
+Both API and legacy Flask responses carry CSP, nosniff, anti-framing,
+and restricted permissions headers. The API uses `Referrer-Policy: no-referrer`.
+The legacy Flask interface uses `Referrer-Policy: same-origin`: native POST form
+navigations otherwise send `Origin: null` under `no-referrer` and are rejected by
+the origin allowlist. Cross-origin destinations still receive no referrer;
+origin/host validation and session CSRF checks remain required. After updating,
+restart Flask and reload the home page before submitting a new form so the browser
+uses the updated policy and session token. See the
+[Fetch Origin-header algorithm](https://fetch.spec.whatwg.org/#append-a-request-origin-header).
+HTTPS responses also carry HSTS. Debug and the
 legacy development reloader are disabled. FastAPI's explicit development
 `--reload` option remains available.
 

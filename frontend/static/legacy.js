@@ -1,4 +1,8 @@
 "use strict";
+document.querySelector("#researchForm").addEventListener("submit", event => {
+  event.currentTarget.querySelector("button").disabled = true;
+  document.querySelector("#researchStatus").hidden = false;
+});
 function appendText(parent, tag, text) {
   const node = document.createElement(tag);
   node.textContent = String(text ?? "");

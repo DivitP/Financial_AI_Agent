@@ -45,13 +45,17 @@ def test_research_and_fundamental_run_persists_offline_results(
     fundamental = main.AgentResult(
         "fundamental", "AAPL", "Financial evidence", ["https://example.com/financials"]
     )
-    monkeypatch.setattr(main, "run_search_agent", lambda _ticker: search)
-    monkeypatch.setattr(main, "run_fundamental_agent", lambda _ticker: fundamental)
+    monkeypatch.setattr(
+        "financial_ai.reporting_legacy.build_live_research",
+        lambda _ticker, _path: [(r.name, r.content, r.sources) for r in (search, fundamental)],
+    )
 
     output = main.run_research_and_fundamental_agents("AAPL", str(tmp_path / "runtime"))
     stored = output["vectorstore"].similarity_search_with_relevance_scores("AAPL evidence", k=5)
 
     assert "Research Analysis" in output["report_md"]
+    assert output["report_md"].startswith("## Fundamental Analysis")
+    assert not (tmp_path / "runtime" / "vectorstore.db").exists()
     assert len(stored) == 2
 
 
@@ -117,12 +121,22 @@ def test_rag_answer_uses_retrieved_context_and_deduplicates_sources(
 
     class FakeChatGroq:
         def __init__(self, **_kwargs):
-            pass
+            assert _kwargs["model_name"] == "fixture-configured-model"
+            assert _kwargs["groq_api_key"] == "test-groq-key"
 
         def invoke(self, _messages):
             return SimpleNamespace(content="Answer grounded in the filing.")
 
     monkeypatch.setattr(main, "ChatGroq", FakeChatGroq)
+    from pydantic import SecretStr
+
+    monkeypatch.setattr(
+        main,
+        "get_settings",
+        lambda: SimpleNamespace(
+            groq_model="fixture-configured-model", groq_api_key=SecretStr("test-groq-key")
+        ),
+    )
 
     answer = main.answer_question_with_rag(FakeVectorStore(), "AAPL", "How is revenue?", k=6)
 

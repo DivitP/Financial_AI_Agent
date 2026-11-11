@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 
 import bleach  # type: ignore[import-untyped]
 import markdown  # type: ignore[import-untyped]
+from bs4 import BeautifulSoup
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -38,8 +39,8 @@ def safe_link(value):
 
 
 def sanitized_markdown(value):
-    return bleach.clean(
-        markdown.markdown(value or ""),
+    cleaned = bleach.clean(
+        markdown.markdown(value or "", extensions=["tables", "fenced_code", "sane_lists"]),
         tags={
             "p",
             "h1",
@@ -57,11 +58,34 @@ def sanitized_markdown(value):
             "a",
             "br",
             "hr",
+            "table",
+            "thead",
+            "tbody",
+            "tr",
+            "th",
+            "td",
+            "details",
+            "summary",
         },
         attributes=lambda tag, name, val: tag == "a" and name == "href" and bool(safe_link(val)),
         protocols={"http", "https"},
         strip=True,
     )
+    document = BeautifulSoup(cleaned, "html.parser")
+    for table in document.find_all("table"):
+        wrapper = document.new_tag(
+            "div",
+            attrs={
+                "class": "report-table",
+                "role": "region",
+                "tabindex": "0",
+                "aria-label": "Research data table",
+            },
+        )
+        table.wrap(wrapper)
+        for header in table.select("thead th"):
+            header["scope"] = "col"
+    return str(document)
 
 
 def rejected_browser_request(method, headers, origins):

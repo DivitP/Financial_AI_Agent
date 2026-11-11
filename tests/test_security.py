@@ -83,3 +83,32 @@ def test_legacy_has_no_html_sinks():
     script = Path("frontend/static/legacy.js").read_text()
     assert "innerHTML" not in script
     assert "insertAdjacentHTML" not in script
+
+
+@pytest.mark.parametrize("path", ["/run", "/ask"])
+def test_legacy_native_forms_preserve_origin_and_require_csrf(import_frontend, path):
+    client = import_frontend.app.test_client()
+    origin = "http://localhost:8501"
+    page = client.get("/", base_url=origin)
+    # no-referrer would turn native form navigation's Origin into "null".
+    assert page.headers["Referrer-Policy"] == "same-origin"
+    with client.session_transaction(base_url=origin) as session:
+        token = session["csrf_token"]
+    headers = {"Origin": origin, "Sec-Fetch-Site": "same-origin"}
+    # Blank input exercises form validation without calling live providers.
+    response = client.post(path, base_url=origin, data={"csrf_token": token}, headers=headers)
+    assert response.status_code == 200
+    assert response.headers["Referrer-Policy"] == "same-origin"
+    assert client.post(path, base_url=origin, data={}, headers=headers).status_code == 403
+    for bad_headers in (
+        {"Origin": "null", "Sec-Fetch-Site": "same-origin"},
+        {"Origin": "https://evil.test", "Sec-Fetch-Site": "cross-site"},
+        {"Origin": origin, "Sec-Fetch-Site": "cross-site"},
+        {"Origin": origin, "Host": "evil.test"},
+    ):
+        assert (
+            client.post(
+                path, base_url=origin, data={"csrf_token": token}, headers=bad_headers
+            ).status_code
+            == 403
+        )

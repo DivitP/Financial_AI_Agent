@@ -694,7 +694,7 @@ class UltraFastTechnicalAnalysisAgent:
         
         return summary
 
-def run_enhanced_analysis(ticker: str) -> Dict:
+def _run_experimental_analysis(ticker: str) -> Dict:
     """Run enhanced analysis with ARIMA, GARCH, and Bollinger Bands"""
     try:
         print(f"Starting enhanced technical analysis for {ticker}...")
@@ -827,6 +827,11 @@ def run_enhanced_analysis(ticker: str) -> Dict:
             'garch_image': None,
             'status': 'error'
         }
+
+def run_enhanced_analysis(ticker: str) -> Dict:
+    """Use validated stable-provider history with explicit fallback and provenance."""
+    from financial_ai.analysis.legacy_technical import build_technical_report
+    return build_technical_report(ticker)
 
 # Legacy function for backward compatibility
 def run_ultra_fast_analysis(ticker: str) -> Dict:

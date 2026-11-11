@@ -2,6 +2,7 @@ from flask import Flask, request, render_template, jsonify, session
 from secrets import token_hex, compare_digest
 from urllib.parse import urlsplit
 from werkzeug.exceptions import HTTPException
+from groq import APIError, AuthenticationError, NotFoundError, RateLimitError
 from financial_ai.security import HEADERS, safe_link, sanitized_markdown, rejected_browser_request
 import os
 import sys
@@ -18,7 +19,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from main import run_research_and_fundamental_agents, get_vectorstore, answer_question_with_rag, upsert_results_to_vectorstore
+from main import run_research_and_fundamental_agents, get_source_vectorstore as get_vectorstore, answer_question_with_rag, upsert_results_to_vectorstore
 from settings import get_settings
 
 load_dotenv()
@@ -48,6 +49,9 @@ def protect_requests():
 @app.after_request
 def security_headers(response):
     response.headers.update(HEADERS)
+    # Native POST forms need their same-origin Origin header for validation.
+    # no-referrer makes browsers send Origin: null for these navigations.
+    response.headers["Referrer-Policy"] = "same-origin"
     if request.is_secure:
         response.headers["Strict-Transport-Security"] = "max-age=31536000"
     return response
@@ -56,13 +60,26 @@ def security_headers(response):
 def safe_http_error(error):
     return jsonify(error=error.name), error.code
 
+@app.errorhandler(APIError)
+def safe_groq_error(error):
+    # Provider error bodies can contain prompts or credentials; never render them.
+    if isinstance(error, NotFoundError):
+        message = "Groq could not access the configured model. Set GROQ_MODEL in .env to a model available to your Groq account, then restart the app."
+    elif isinstance(error, AuthenticationError):
+        message = "Groq rejected the API credentials. Check GROQ_API_KEY in .env, then restart the app."
+    elif isinstance(error, RateLimitError):
+        message = "Groq's request or token limit was reached. Wait before retrying and check your account limits."
+    else:
+        message = "Groq could not complete this request. Check the provider status and your configuration before retrying."
+    return render_template(INDEX_HTML, error=message, ticker=""), 503
+
 # Global storage for background tasks
 background_tasks = {}
 
 INDEX_HTML = 'index.html'
 
 def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str):
-    """Run comprehensive technical analysis with ARIMA, GARCH, and Bollinger Bands"""
+    """Run source-backed historical conditions and Bollinger charts."""
     try:
         background_tasks[task_id] = {
             'status': 'processing',
@@ -79,20 +96,28 @@ def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str
                 'current_step': 'Importing enhanced analysis module...'
             })
             
-            # Import the enhanced run_ultra_fast_analysis function
-            from agents.ultra_fast_technical_agent import run_enhanced_analysis
+            from financial_ai.analysis.legacy_technical import build_technical_report
             
             background_tasks[task_id].update({
                 'progress': 30,
-                'current_step': 'Running comprehensive analysis with ARIMA/GARCH...'
+                'current_step': 'Collecting price history and calculating historical indicators...'
             })
             
             # Run the enhanced analysis which includes all charts
-            result = run_enhanced_analysis(ticker)
+            result = build_technical_report(ticker, settings=settings)
+            if result.get('status') != 'success':
+                background_tasks[task_id] = {
+                    'status': 'failed', 'progress': 100,
+                    'current_step': 'Historical technical analysis unavailable',
+                    'tech_text': result.get('text', 'Historical data unavailable.'),
+                    'tech_image': None, 'bollinger_image': None,
+                    'arima_image': None, 'garch_image': None,
+                }
+                return
             
             background_tasks[task_id].update({
                 'progress': 70,
-                'current_step': 'Processing all forecast models...'
+                'current_step': 'Preparing historical charts...'
             })
             
             # Extract all results
@@ -117,7 +142,7 @@ def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str
                     name="advanced_technical", 
                     ticker=ticker, 
                     content=tech_text, 
-                    sources=["https://finance.yahoo.com/", "ARIMA Model", "GARCH Model"]
+                    sources=result.get('sources', [])
                 )
                 upsert_results_to_vectorstore(vs, [result_obj])
                 print("Successfully updated vectorstore with advanced analysis")
@@ -128,7 +153,7 @@ def run_optimized_technical_analysis(task_id: str, ticker: str, persist_dir: str
             background_tasks[task_id] = {
                 'status': 'completed',
                 'progress': 100,
-                'current_step': 'Advanced analysis complete!',
+                'current_step': 'Historical technical analysis complete',
                 'tech_image': tech_image,
                 'bollinger_image': bollinger_image,
                 'arima_image': arima_image,
@@ -250,9 +275,21 @@ def run_agents():
     ticker = (request.form.get("ticker") or "").strip().upper()
     if not ticker:
         return render_template(INDEX_HTML, report="Please provide a ticker.")
-    
+    from financial_ai.providers.legacy_live import symbol
+    try:
+        ticker = symbol(ticker)
+    except ValueError:
+        return render_template(INDEX_HTML, error="Enter a valid stock or ETF symbol (up to 15 characters).", ticker=""), 422
+    from financial_ai.analysis.research_assessment import ValuationAssumptions
+    from pydantic import ValidationError
+    assumption_fields = {name: request.form[name] for name in ValuationAssumptions.model_fields if name in request.form}
+    try:
+        options = ValuationAssumptions.model_validate(assumption_fields)
+    except ValidationError:
+        return render_template(INDEX_HTML, error="Check the valuation assumptions: horizon 1–10 years, earnings growth −50% to 50%, exit P/E 6–80, and target equity-value growth −20% to 30%.", ticker=ticker), 422
     # Run research and fundamental agents first (fast)
-    out = run_research_and_fundamental_agents(ticker, str(settings.persist_dir))
+    out = (run_research_and_fundamental_agents(ticker, str(settings.persist_dir), assumptions=options.model_dump())
+           if assumption_fields else run_research_and_fundamental_agents(ticker, str(settings.persist_dir)))
     
     # Convert markdown to HTML for immediate display
     text_report_html = sanitized_markdown(out["report_md"] or "")
@@ -274,7 +311,8 @@ def run_agents():
         report=True,
         text_report_html=text_report_html,
         ticker=ticker,
-        task_id=task_id
+        task_id=task_id,
+        valuation_options=options.model_dump()
     )
 
 @app.route("/ask", methods=["POST"]) 

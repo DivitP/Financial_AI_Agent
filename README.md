@@ -78,6 +78,17 @@ approved `RESEARCH_NEWS_FEEDS`/`DOCUMENT_ALLOWED_HOSTS`, and the documented
 Adding FMP or Groq keys alone does not enable collection. The default Compose
 factory remains synthetic regardless of keys in your host `.env`.
 
+### Live assessment in the Flask compatibility interface
+
+For a cited business-trend assessment, comparable annual/YTD financials, valuation
+ratios, and editable scenario assumptions, run `uv run python frontend/app.py` and
+open its printed loopback address (normally <http://localhost:8501>). Configure a
+real `SEC_USER_AGENT` locally for free original filing data; FMP/Yahoo fallbacks
+remain subject to availability. Preserve your existing `.env`.
+This assessment is currently in Flask, not the React demo. It does not issue
+buy/sell instructions or calibrated price forecasts. See the
+[data coverage, formulas and limits](docs/research-assessment.md).
+
 ## Feature status and evidence
 
 “Implemented” means source and offline tests exist, not that every adapter is

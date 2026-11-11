@@ -357,3 +357,79 @@ hardware/storage paths, verified backup restore, configured worker factory,
 release report, provider/license review and explicit known gaps. A new contributor
 can deploy the no-paid-service demo; complete live research and public production
 deployment remain separate, explicitly documented integration/security work.
+
+## Legacy Groq model troubleshooting
+
+Standalone legacy agents and optional Flask follow-up Q&A use `GROQ_MODEL`
+from `.env`. Flask report generation now renders collected facts directly, as
+described below. The Groq default is `openai/gpt-oss-120b`. Groq retired
+`llama-3.3-70b-versatile` for free/developer accounts on August 16, 2026; existing
+`.env` files must be updated explicitly. See
+[Groq's deprecation history](https://console.groq.com/docs/deprecations).
+Availability still depends on the account's permissions and limits; check the
+Groq console or authenticated models endpoint rather than assuming any model ID
+will remain available indefinitely. There is no automatic model fallback.
+
+After changing `GROQ_MODEL`, stop Flask, run `uv run python frontend/app.py`
+again, and reload the home page. Generate and native follow-up submissions show
+safe guidance with HTTP 503 for Groq model access, authentication, quota and
+other API failures. Raw provider bodies and credentials are not rendered. These
+messages do not certify that research completed or that other providers work.
+
+## Flask live reports: formatting and provider fallback
+
+Run `uv run python frontend/app.py` and open the printed loopback address
+(normally `http://localhost:8501`). Preserve your existing `.env`. Restart Flask
+and reload the home page after code/configuration changes; debug reload is off.
+
+The Flask Generate report path collects facts once through the request-scoped
+`LegacyLiveProvider` and renders structured Markdown rather than an unconstrained
+model narrative. Optional Groq follow-up questions remain separate. Independent
+collection uses at most two workers and respects configured provider concurrency;
+the report makes no guaranteed latency claim.
+
+- With `ENABLE_FMP=true` and `FMP_API_KEY`, quote, profile, annual statements and
+  history use FMP's current `/stable/` endpoints. Legacy `/api/v3` endpoint access
+  is no longer required by this web report/technical path. Account subscriptions,
+  rate limits, and source availability still apply.
+- Quotes/history can fall back to Yahoo chart data. News attempts FMP's stock-news
+  endpoint, then a ticker-scoped Yahoo Finance RSS feed. The exact Yahoo feed hosts
+  are fixed and explicitly allowlisted, including `feeds.finance.yahoo.com` for
+  redirects. This does not expand the general document-download allowlist or
+  authorize following arbitrary article URLs.
+- HTTP 401/402/403/429 and invalid responses are coverage failures, not “no news”.
+  A successful RSS fallback displays its provenance and the FMP limitation. RSS
+  headlines are discovery metadata, not verified article bodies, sentiment, or a
+  guarantee that every story is company-specific or recent. Publication dates
+  remain visible. If both providers fail, the section remains unavailable.
+- Reports display original units/currencies, observation and retrieval times,
+  statement periods/filing dates, missing metadata, and adjustment limitations.
+  Data is not automatically current or independently verified against filings.
+  Restatement history is unknown; do not use these snapshots for point-in-time
+  backtesting. No model-generated figures, allocation advice or price targets are
+  inserted to fill gaps.
+- Technical output requires at least 20 valid dated OHLCV observations. It shows
+  historical averages, descriptive conditions and historical bands. Unvalidated
+  ARIMA/GARCH forecast confidence and indicator-derived buy/sell commands are not
+  displayed. A failed result remains failed rather than “analysis complete”.
+- Exact source snapshots are stored locally in `<persist_dir>/legacy_evidence`
+  using content-addressed artifact IDs shown under Evidence record. URLs omit API
+  keys. These are runtime artifacts, never committed or publicly served. FMP data
+  display/retention/redistribution terms still require review for your use case.
+  The local follow-up index uses `<persist_dir>/source_grounded/vectorstore.db`
+  so previously generated, unsupported narratives are not reused as evidence.
+  Old indexes remain untouched; they are not migrated or revalidated.
+
+Markdown table parsing and fenced-code support are enabled before sanitization;
+only safe table/formatting elements survive. Tables have column headers and
+keyboard-focusable scroll regions for narrow screens. Styling lives in the
+existing static stylesheet, with no provider/model HTML execution.
+
+Run the following offline regression checks. These fixtures never contact live providers:
+
+```bash
+uv run pytest tests/test_legacy_live_research.py tests/test_frontend.py tests/test_main.py tests/test_security.py --no-cov
+```
+
+See [FMP's stable API guide](https://site.financialmodelingprep.com/developer/docs/quickstart)
+and [Markdown table parsing](https://python-markdown.github.io/extensions/tables/).

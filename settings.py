@@ -117,7 +117,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("FMP_API_KEY", "FINANCIAL_AI_FMP_API_KEY"),
         repr=False,
     )
-    groq_model: str = Field(default="llama-3.3-70b-versatile", validation_alias="GROQ_MODEL")
+    groq_model: str = Field(default="openai/gpt-oss-120b", validation_alias="GROQ_MODEL")
     local_llm_model: str = Field(default="qwen3:8b", validation_alias="LOCAL_LLM_MODEL")
     local_llm_base_url: str = Field(
         default="http://127.0.0.1:11434",

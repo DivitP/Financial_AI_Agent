@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Iterable, Tuple, Set
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
+from settings import get_settings
 
 from agents.search_agent import agent_executor as search_agent_executor
 from agents.fundamental_agent import agent_executor as fundamental_agent_executor
@@ -299,6 +300,11 @@ def get_vectorstore(persist_dir: str) -> SimpleSQLiteVectorStore:
     return SimpleSQLiteVectorStore(db_path=db_path)
 
 
+def get_source_vectorstore(persist_dir: str) -> SimpleSQLiteVectorStore:
+    """Keep newly collected reports separate from old, unverified agent narratives."""
+    return get_vectorstore(os.path.join(persist_dir, "source_grounded"))
+
+
 def upsert_results_to_vectorstore(vs: SimpleSQLiteVectorStore, results: List[AgentResult]):
     documents: List[str] = []
     metadatas: List[Dict[str, Any]] = []
@@ -332,27 +338,32 @@ def retrieve_context(vs: SimpleSQLiteVectorStore, ticker: str, question: str, k:
     return results
 
 
-def build_report(results: List[AgentResult]) -> str:
+def build_report(results: List[AgentResult], include_sources: bool = True) -> str:
     parts = []
     for r in results:
-        parts.append(f"## {r.name.title()} Analysis\n")
+        title = "Research assessment" if r.name == "assessment" else f"{r.name.title()} Analysis"
+        parts.append(f"## {title}\n")
         parts.append(r.content)
-        if r.sources:
+        if r.sources and include_sources:
             parts.append("\nSources:\n" + "\n".join(r.sources))
         parts.append("\n\n")
     return "\n".join(parts).strip()
 
 
-def run_research_and_fundamental_agents(ticker: str, persist_dir: str = "./chroma_db") -> Dict[str, Any]:
-    """Run only research and fundamental agents for immediate display"""
-    results = [
-        run_search_agent(ticker),
-        run_fundamental_agent(ticker),
-    ]
-    vs = get_vectorstore(persist_dir)
+def run_research_and_fundamental_agents(ticker: str, persist_dir: str = "./chroma_db", assumptions=None) -> Dict[str, Any]:
+    """Collect source-backed facts for the Flask interface before any optional Q&A."""
+    from financial_ai.reporting_legacy import build_live_research
+    options = {}
+    if assumptions is not None:
+        from financial_ai.analysis.research_assessment import ValuationAssumptions
+        options["assumptions"] = ValuationAssumptions.model_validate(assumptions)
+    results = [AgentResult(name, ticker, content, sources)
+               for name, content, sources in build_live_research(ticker, persist_dir, **options)]
+    results.sort(key=lambda result: {"assessment": 0, "fundamental": 1, "research": 2}.get(result.name, 3))
+    vs = get_source_vectorstore(persist_dir)
     upsert_results_to_vectorstore(vs, results)
     return {
-        "report_md": build_report(results),
+        "report_md": build_report(results, include_sources=False),
         "vectorstore": vs,
     }
 
@@ -400,14 +411,22 @@ def answer_question_with_rag(vs: SimpleSQLiteVectorStore, ticker: str, question:
 
     system = (
         "You are a financial analysis assistant. Answer the user's question strictly using the provided context excerpts. "
-        "Cite evidence inline by noting the agent name in parentheses, e.g., (fundamental) or (research). If the answer is not supported by the context, say you don't have enough information."
+        "Distinguish reported facts, calculated metrics and illustrative valuation assumptions. "
+        "Cite the exact source URLs and evidence identifiers supplied in the excerpts; agent names are not citations. "
+        "Do not describe scenario assumptions as forecasts, invent missing values or offer personalized allocation, buy or sell instructions. "
+        "If the answer is not supported by the context, say you don't have enough information."
     )
     prompt = ChatPromptTemplate.from_messages([
         ("system", system + "\n" + UNTRUSTED_POLICY),
         ("human", "Ticker: {ticker}\nQuestion: {question}\n\nContext:\n{context}\n\nAnswer concisely and include citations."),
     ])
 
-    llm = ChatGroq(temperature=0, groq_api_key=os.getenv("GROQ_API_KEY"), model_name="llama3-70b-8192")
+    settings = get_settings()
+    llm = ChatGroq(
+        temperature=0,
+        groq_api_key=settings.groq_api_key.get_secret_value() if settings.groq_api_key else None,
+        model_name=settings.groq_model,
+    )
     messages = prompt.format_messages(ticker=ticker, question=question, context="\n\n".join(context_blocks))
     ai_msg = llm.invoke(messages)
     answer_text = getattr(ai_msg, "content", str(ai_msg))
